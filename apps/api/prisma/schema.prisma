@@ -1,0 +1,239 @@
+// WorkShop Manager — Prisma Schema v1.0
+// Corresponde al PRD v1.0: 9 tablas, multi-tenant, state machine OT
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ──────────────────────────────────────────────────────────────────
+
+enum RolUsuario {
+  JEFE
+  SUPERVISOR
+  TECNICO
+  BODEGA
+  ADMIN
+}
+
+enum EstadoOT {
+  INGRESADO          // Recibido en taller
+  EN_EVALUACION      // Evaluación técnica en curso
+  ESPERANDO_REPUESTOS // Pendiente llegada de partes
+  EN_EJECUCION       // Reparación en curso
+  CONTROL_CALIDAD    // Revisión final
+  LISTO_PARA_ENTREGA // Aprobado, esperando retiro
+  ENTREGADO          // Completado exitosamente
+  CANCELADO          // Anulado con comentario obligatorio
+  EN_ESPERA          // Pausado temporalmente
+}
+
+enum EstadoRepuesto {
+  PENDIENTE    // Registrado, aún no solicitado
+  EN_ESPERA    // Solicitado, esperando confirmación
+  EN_TRANSITO  // En camino al taller
+  RECIBIDO     // Disponible en bodega
+}
+
+enum OrigenRepuesto {
+  KOMATSU // Proveedor externo
+  TALLER  // Stock interno
+}
+
+enum TipoEventoLog {
+  CAMBIO_ESTADO
+  SUBIDA_IT
+  RECEPCION_REPUESTO
+  REGISTRO_TAREA_ADICIONAL
+  CREACION_OT
+  ACTUALIZACION_REPUESTO
+}
+
+// ─── Tablas ──────────────────────────────────────────────────────────────────
+
+model Taller {
+  id        String   @id @default(cuid())
+  nombre    String
+  rut       String   @unique
+  direccion String?
+  activo    Boolean  @default(true)
+  creadoEn  DateTime @default(now()) @map("creado_en")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  usuarios        Usuario[]
+  vehiculos       Vehiculo[]
+  ordenesTrabajo  OrdenTrabajo[]
+
+  @@map("taller")
+}
+
+model Usuario {
+  id           String      @id @default(cuid())
+  idTaller     String      @map("id_taller")
+  nombre       String
+  email        String
+  passwordHash String      @map("password_hash")
+  rol          RolUsuario
+  activo       Boolean     @default(true)
+  creadoEn     DateTime    @default(now()) @map("creado_en")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  taller              Taller          @relation(fields: [idTaller], references: [id])
+  ordenesAsignadas    OrdenTrabajo[]  @relation("TecnicoAsignado")
+  tareasAdicionales   TareaAdicional[]
+  logsGenerados       LogEstadoOT[]
+
+  @@unique([email, idTaller])
+  @@index([idTaller, rol])
+  @@map("usuario")
+}
+
+model Vehiculo {
+  id          String   @id @default(cuid())
+  idTaller    String   @map("id_taller")
+  marca       String
+  modelo      String
+  numeroSerie String   @map("numero_serie") // VIN
+  cliente     String   // empresa/mina propietaria
+  sucursal    String?
+  activo      Boolean  @default(true)
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  taller         Taller         @relation(fields: [idTaller], references: [id])
+  ordenesTrabajo OrdenTrabajo[]
+
+  @@unique([idTaller, numeroSerie]) // VIN único por taller
+  @@index([idTaller, numeroSerie])
+  @@map("vehiculo")
+}
+
+model OrdenTrabajo {
+  id               String    @id @default(cuid())
+  idTaller         String    @map("id_taller")
+  idVehiculo       String    @map("id_vehiculo")
+  idTecnico        String?   @map("id_tecnico")
+  numeroOT         String    @map("numero_ot")   // formato: OT-YYYY-NNN
+  estado           EstadoOT  @default(INGRESADO)
+  descripcion      String?   // motivo de ingreso inicial
+  kilometraje      Int?      // odómetro al ingreso
+  kilometrajeSalida Int?     @map("kilometraje_salida")
+  fechaEntrega     DateTime? @map("fecha_entrega")
+  receptorNombre   String?   @map("receptor_nombre")
+  comentarioCancelacion String? @map("comentario_cancelacion")
+  creadoEn         DateTime  @default(now()) @map("creado_en")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  taller           Taller          @relation(fields: [idTaller], references: [id])
+  vehiculo         Vehiculo        @relation(fields: [idVehiculo], references: [id])
+  tecnico          Usuario?        @relation("TecnicoAsignado", fields: [idTecnico], references: [id])
+  informeTecnico   InformeTecnico?
+  repuestos        Repuesto[]
+  tareasAdicionales TareaAdicional[]
+  logs             LogEstadoOT[]
+
+  @@unique([idTaller, numeroOT])
+  @@index([idTaller, estado])       // OTs activas por taller
+  @@index([idVehiculo, estado])     // validar 1 OT activa por vehículo
+  @@map("orden_trabajo")
+}
+
+model InformeTecnico {
+  id              String    @id @default(cuid())
+  idOT            String    @unique @map("id_ot") // 1:1 con OrdenTrabajo
+  fechaEvaluacion DateTime  @map("fecha_evaluacion")
+  evaluador       String
+  kilometraje     Int
+  observaciones   String?
+  archivoUrl      String    @map("archivo_url")  // URL en S3
+  archivoNombre   String    @map("archivo_nombre")
+  creadoEn        DateTime  @default(now()) @map("creado_en")
+
+  ordenTrabajo    OrdenTrabajo @relation(fields: [idOT], references: [id])
+  tareas          TareaIT[]
+
+  @@map("informe_tecnico")
+}
+
+model TareaIT {
+  id               String   @id @default(cuid())
+  idIT             String   @map("id_it")
+  numero           Int      // número de tarea en el plan de servicio
+  componente       String
+  descripcion      String
+  requiereRepuesto Boolean  @default(false) @map("requiere_repuesto")
+  creadoEn         DateTime @default(now()) @map("creado_en")
+  // Inmutable post-registro: sin updatedAt
+
+  informeTecnico   InformeTecnico @relation(fields: [idIT], references: [id])
+  repuesto         Repuesto?      // auto-creado si requiereRepuesto = true
+
+  @@index([idIT])
+  @@map("tarea_it")
+}
+
+model Repuesto {
+  id           String         @id @default(cuid())
+  idOT         String         @map("id_ot")
+  idTareaIT    String?        @unique @map("id_tarea_it") // null si fue agregado manualmente
+  descripcion  String
+  cantidad     Decimal        @db.Decimal(10, 2)
+  unidad       String         // ej: "unidad", "litros", "metros"
+  origen       OrigenRepuesto
+  costo        Decimal?       @db.Decimal(12, 2) // requerido si origen = TALLER
+  estado       EstadoRepuesto @default(PENDIENTE)
+  fechaEstimada DateTime?     @map("fecha_estimada")
+  fechaRecepcion DateTime?    @map("fecha_recepcion")
+  idReceptor   String?        @map("id_receptor")
+  creadoEn     DateTime       @default(now()) @map("creado_en")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  ordenTrabajo OrdenTrabajo   @relation(fields: [idOT], references: [id])
+  tareaIT      TareaIT?       @relation(fields: [idTareaIT], references: [id])
+
+  @@index([idOT, estado]) // repuestos pendientes por OT
+  @@map("repuesto")
+}
+
+model TareaAdicional {
+  id                String   @id @default(cuid())
+  idOT              String   @map("id_ot")
+  idUsuario         String   @map("id_usuario")
+  descripcion       String
+  componente        String?
+  tipoTrabajo       String?  @map("tipo_trabajo")
+  momentoRegistro   EstadoOT @map("momento_registro") // estado en que se identificó
+  insumos           String?
+  costo             Decimal  @db.Decimal(12, 2)
+  creadoEn          DateTime @default(now()) @map("creado_en")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  ordenTrabajo OrdenTrabajo @relation(fields: [idOT], references: [id])
+  usuario      Usuario      @relation(fields: [idUsuario], references: [id])
+
+  @@index([idOT, momentoRegistro])
+  @@map("tarea_adicional")
+}
+
+model LogEstadoOT {
+  id             String         @id @default(cuid())
+  idOT           String         @map("id_ot")
+  idUsuario      String         @map("id_usuario")
+  tipoEvento     TipoEventoLog  @map("tipo_evento")
+  estadoAnterior EstadoOT?      @map("estado_anterior")
+  estadoNuevo    EstadoOT?      @map("estado_nuevo")
+  descripcion    String
+  comentario     String?        // obligatorio en CANCELADO
+  fechaEvento    DateTime       @default(now()) @map("fecha_evento")
+  // Inmutable: sin updatedAt, sin DELETE endpoint
+
+  ordenTrabajo OrdenTrabajo @relation(fields: [idOT], references: [id])
+  usuario      Usuario      @relation(fields: [idUsuario], references: [id])
+
+  @@index([idOT, fechaEvento(sort: Desc)]) // historial de OT
+  @@map("log_estado_ot")
+}

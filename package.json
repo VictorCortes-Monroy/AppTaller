@@ -1,0 +1,23 @@
+{
+  "name": "workshop-manager",
+  "version": "0.0.1",
+  "private": true,
+  "description": "WorkShop Manager — SaaS de gestión de talleres vehiculares",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "dev:api": "pnpm --filter api dev",
+    "dev:web": "pnpm --filter web dev",
+    "build": "pnpm --filter \"./apps/*\" build",
+    "lint": "pnpm --filter \"./apps/*\" lint",
+    "db:migrate": "pnpm --filter api db:migrate",
+    "db:generate": "pnpm --filter api db:generate",
+    "db:studio": "pnpm --filter api db:studio"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
