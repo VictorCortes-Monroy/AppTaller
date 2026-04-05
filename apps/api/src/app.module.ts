@@ -5,6 +5,11 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { VehiculosModule } from './vehiculos/vehiculos.module';
 import { OrdenesModule } from './ordenes/ordenes.module';
+import { S3Module } from './common/s3/s3.module';
+import { InformeTecnicoModule } from './informe-tecnico/informe-tecnico.module';
+import { RepuestosModule } from './repuestos/repuestos.module';
+import { TareasAdicionalesModule } from './tareas-adicionales/tareas-adicionales.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -13,20 +18,22 @@ import { OrdenesModule } from './ordenes/ordenes.module';
       envFilePath: '.env',
     }),
     PrismaModule,
+    // ─── Common ───────────────────────────────
+    S3Module,
     // ─── Fase 1 ───────────────────────────────
     AuthModule,
     UsersModule,
     // ─── Fase 2 ───────────────────────────────
     VehiculosModule,
     OrdenesModule,
-    // ─── Fase 3 (pendiente) ───────────────────
-    // InformeTecnicoModule,
-    // ─── Fase 4 (pendiente) ───────────────────
-    // RepuestosModule,
-    // ─── Fase 5 (pendiente) ───────────────────
-    // TareasAdicionalesModule,
-    // ─── Fase 6 (pendiente) ───────────────────
-    // DashboardModule,
+    // ─── Fase 3 ───────────────────────────────
+    InformeTecnicoModule,
+    // ─── Fase 4 ───────────────────────────────
+    RepuestosModule,
+    // ─── Fase 5 ───────────────────────────────
+    TareasAdicionalesModule,
+    // ─── Fase 6 ───────────────────────────────
+    DashboardModule,
   ],
 })
 export class AppModule {}

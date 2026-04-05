@@ -1,6 +1,6 @@
 # Fase 4 — Repuestos
 
-**Estado:** ⏳ Pendiente
+**Estado:** ✅ Completado — 2026-04-04
 
 ## Objetivo
 Gestión de repuestos con 4 estados, flujo exclusivo de bodega para actualizaciones, y validaciones según estado de la OT.
@@ -31,8 +31,8 @@ Solo avance hacia adelante. Solo rol BODEGA puede transicionar estados.
 
 ## Criterios de aceptación
 
-- [ ] Agregar repuesto en OT ENTREGADA → 422
-- [ ] Repuesto TALLER sin costo → 400
-- [ ] SUPERVISOR intenta cambiar estado repuesto → 403
-- [ ] Al recibir repuesto, `fechaRecepcion` y `idReceptor` guardados correctamente
-- [ ] Dashboard muestra repuestos agrupados por OT con días de espera
+- [x] Agregar repuesto en OT ENTREGADA → 422
+- [x] Repuesto TALLER sin costo → 400
+- [x] SUPERVISOR intenta cambiar estado repuesto → 403
+- [x] Al recibir repuesto, `fechaRecepcion` e `idReceptor` guardados correctamente
+- [x] Dashboard muestra repuestos agrupados por OT con días de espera

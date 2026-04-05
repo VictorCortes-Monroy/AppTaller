@@ -1,4 +1,6 @@
 services:
+  # ─── Infraestructura ────────────────────────────────────────────────────────
+
   postgres:
     image: postgres:15-alpine
     container_name: workshop_postgres
@@ -28,6 +30,49 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  # ─── Aplicación ─────────────────────────────────────────────────────────────
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: workshop_api
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      # DB — apunta al contenedor postgres (nombre interno de Docker)
+      DATABASE_URL: postgresql://workshop:workshop@postgres:5432/workshop_dev
+      # JWT
+      JWT_SECRET: dev-secret-cambia-en-produccion-usa-openssl-rand-base64-64
+      JWT_ACCESS_EXPIRES: 8h
+      JWT_REFRESH_EXPIRES: 7d
+      # API
+      PORT: 3001
+      NODE_ENV: development
+      FRONTEND_URL: http://localhost:3000
+      # S3 — desactivado para desarrollo local
+      SKIP_S3: "true"
+      AWS_REGION: us-east-1
+      AWS_S3_BUCKET: workshop-manager-it-files
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # NEXT_PUBLIC_* se hornea en el build — debe ser accesible desde el browser del host
+        NEXT_PUBLIC_API_URL: http://localhost:3001
+    container_name: workshop_web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
 
 volumes:
   pgdata:

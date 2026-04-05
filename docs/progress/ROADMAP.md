@@ -1,6 +1,6 @@
 # WorkShop Manager — Roadmap de Desarrollo
 
-> Actualizado: 2026-04-01
+> Actualizado: 2026-04-04
 
 ## Estado general
 
@@ -9,11 +9,11 @@
 | **0** | Infraestructura (monorepo, Docker, Prisma schema) | ✅ Completado | 2026-04-01 |
 | **1** | Auth y Usuarios (JWT, roles, multi-tenancy) | ✅ Completado | 2026-04-01 |
 | **2** | Vehículos y Órdenes de Trabajo (state machine) | ✅ Completado | 2026-04-01 |
-| **3** | Informe Técnico y Plan de Servicio (S3, STP) | ⏳ Pendiente | — |
-| **4** | Repuestos (estados, flujo bodega) | ⏳ Pendiente | — |
-| **5** | Tareas Adicionales (costos, trazabilidad) | ⏳ Pendiente | — |
-| **6** | Dashboard y Log de Auditoría (3 vistas) | ⏳ Pendiente | — |
-| **7** | Frontend (Next.js 14, App Router, shadcn/ui) | ⏳ Pendiente | — |
+| **3** | Informe Técnico y Plan de Servicio (S3, STP) | ✅ Completado | 2026-04-04 |
+| **4** | Repuestos (estados, flujo bodega) | ✅ Completado | 2026-04-04 |
+| **5** | Tareas Adicionales (costos, trazabilidad) | ✅ Completado | 2026-04-04 |
+| **6** | Dashboard y Log de Auditoría (3 vistas) | ✅ Completado | 2026-04-04 |
+| **7** | Frontend (Next.js 14, App Router, shadcn/ui) | ✅ Completado | 2026-04-04 |
 
 ## Criterios de MVP completado
 

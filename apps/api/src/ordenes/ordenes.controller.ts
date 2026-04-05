@@ -70,4 +70,14 @@ export class OrdenesController {
   ) {
     return this.ordenesService.registrarEntrega(id, idTaller, usuario, dto);
   }
+
+  @Get(':id/log')
+  @Roles(RolUsuario.JEFE, RolUsuario.SUPERVISOR, RolUsuario.BODEGA, RolUsuario.ADMIN)
+  @ApiOperation({ summary: 'Log de auditoría de una OT (insert-only, orden cronológico desc)' })
+  getLog(
+    @Param('id') id: string,
+    @CurrentTaller() idTaller: string,
+  ) {
+    return this.ordenesService.getLog(id, idTaller);
+  }
 }

@@ -283,6 +283,21 @@ export class OrdenesService {
     return esTransicionValida(ot.estado, nuevoEstado, usuario.rol as RolUsuario);
   }
 
+  // ─── Log de auditoría ────────────────────────────────────────────────────
+
+  async getLog(idOT: string, idTaller: string) {
+    const ot = await this.prisma.ordenTrabajo.findFirst({
+      where: { id: idOT, idTaller },
+    });
+    if (!ot) throw new NotFoundException('Orden de trabajo no encontrada');
+
+    return this.prisma.logEstadoOT.findMany({
+      where: { idOT },
+      include: { usuario: { select: { nombre: true, rol: true } } },
+      orderBy: { fechaEvento: 'desc' },
+    });
+  }
+
   /**
    * Busca en el log cuál era el estado de la OT antes de entrar en EN_ESPERA.
    */

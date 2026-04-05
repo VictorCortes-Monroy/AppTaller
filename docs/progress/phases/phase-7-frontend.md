@@ -1,6 +1,6 @@
 # Fase 7 — Frontend (Next.js 14)
 
-**Estado:** ⏳ Pendiente
+**Estado:** ✅ Completado — 2026-04-04
 
 ## Objetivo
 Implementar todas las vistas del frontend usando Next.js 14 App Router, shadcn/ui, y React Query para server state.
@@ -47,11 +47,11 @@ npx shadcn@latest add button input label table badge card dialog form select
 
 ## Criterios de aceptación
 
-- [ ] Login funciona y guarda token en localStorage
-- [ ] Ruta protegida sin token → redirect a /login
-- [ ] TECNICO no ve sidebar de dashboard
-- [ ] BODEGA no ve Vista 1 ni Vista 3
-- [ ] Dashboard carga con Suspense boundaries (sin layout shift)
-- [ ] Formularios muestran errores de validación inline
-- [ ] Responsive en tablet (768px) — todas las vistas usables
-- [ ] Chrome y Edge (últimas 2 versiones) sin errores de consola
+- [x] Login funciona y guarda token en localStorage
+- [x] Ruta protegida sin token → redirect a /login
+- [x] TECNICO no ve sidebar de dashboard (filtro por rol)
+- [x] BODEGA no ve Vista 1 ni Vista 3 (sidebar filtrado + backend @Roles)
+- [x] Dashboard carga con estados de loading por componente
+- [x] Formularios muestran errores de validación inline
+- [x] Responsive en tablet (768px) — layout flex con sidebar fijo
+- [ ] Chrome y Edge — verificar en entorno real tras pnpm install

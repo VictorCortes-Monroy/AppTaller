@@ -19,5 +19,8 @@
   },
   "devDependencies": {
     "typescript": "^5.4.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["bcrypt", "@nestjs/core", "@prisma/client", "@prisma/engines", "prisma"]
   }
 }

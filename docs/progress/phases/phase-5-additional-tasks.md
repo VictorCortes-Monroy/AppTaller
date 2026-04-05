@@ -1,6 +1,6 @@
 # Fase 5 — Tareas Adicionales
 
-**Estado:** ⏳ Pendiente
+**Estado:** ✅ Completado — 2026-04-04
 
 ## Objetivo
 Registro de trabajo adicional identificado durante la ejecución, con costo obligatorio y trazabilidad del momento en que fue identificado.
@@ -23,9 +23,9 @@ Registro de trabajo adicional identificado durante la ejecución, con costo obli
 
 ## Criterios de aceptación
 
-- [ ] Tarea sin costo → 400
-- [ ] BODEGA intenta crear tarea adicional → 403
-- [ ] `momentoRegistro` puede diferir del estado actual de la OT
-- [ ] TECNICO A no puede editar tarea de TECNICO B
-- [ ] Tarea en OT completada no editable → 422
-- [ ] Creación genera log automático en `LogEstadoOT`
+- [x] Tarea sin costo → 400
+- [x] BODEGA intenta crear tarea adicional → 403
+- [x] `momentoRegistro` puede diferir del estado actual de la OT
+- [x] TECNICO A no puede editar tarea de TECNICO B
+- [x] Tarea en OT completada no editable → 422
+- [x] Creación genera log automático en `LogEstadoOT`

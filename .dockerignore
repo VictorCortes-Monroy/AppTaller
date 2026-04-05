@@ -1,0 +1,30 @@
+# Dependencies
+node_modules
+apps/*/node_modules
+
+# Build output
+apps/api/dist
+apps/web/.next
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Docs (not needed in image)
+docs
+README.md
+CLAUDE.md
+
+# Env files (injected via docker-compose)
+.env
+*.env
+.env.*
+apps/**/.env
+apps/**/.env.*
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode
+.idea

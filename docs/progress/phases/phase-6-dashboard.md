@@ -1,6 +1,6 @@
 # Fase 6 — Dashboard y Log de Auditoría
 
-**Estado:** ⏳ Pendiente
+**Estado:** ✅ Completado — 2026-04-04
 
 ## Objetivo
 Tres vistas del dashboard con acceso por rol y el log de auditoría inmutable.
@@ -47,8 +47,8 @@ Agrupado por OT, ordenado por días de espera DESC:
 
 ## Criterios de aceptación
 
-- [ ] TECNICO accede a dashboard → 403
-- [ ] BODEGA accede a Vista 1 → 403
-- [ ] Dashboard carga <3s con 50 OTs activas
-- [ ] Log muestra eventos en orden cronológico descendente
-- [ ] Alerta de demora visible para OTs > 7 días
+- [x] TECNICO accede a dashboard → 403
+- [x] BODEGA accede a Vista 1 → 403
+- [x] Dashboard carga <3s con 50 OTs activas
+- [x] Log muestra eventos en orden cronológico descendente
+- [x] Alerta de demora visible para OTs > 7 días

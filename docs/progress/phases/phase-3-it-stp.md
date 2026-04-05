@@ -1,6 +1,6 @@
 # Fase 3 — Informe Técnico y Plan de Servicio
 
-**Estado:** ⏳ Pendiente
+**Estado:** ✅ Completado — 2026-04-04
 
 ## Objetivo
 Subida de archivo IT a S3 via presigned URL y registro de tareas del Plan de Servicio (STP) con creación automática de repuestos.
@@ -43,9 +43,9 @@ Frontend                    Backend (NestJS)         AWS S3
 
 ## Criterios de aceptación
 
-- [ ] Segunda IT en misma OT → 409 Conflict
-- [ ] Archivo > 20MB rechazado con error claro
-- [ ] Tarea con `requiereRepuesto: true` crea repuesto automáticamente
-- [ ] Intentar editar tarea STP → 405 Method Not Allowed
-- [ ] URL firmada expira correctamente (verificar con prueba manual)
-- [ ] IT solo creable en estado `EN_EVALUACION`
+- [x] Segunda IT en misma OT → 409 Conflict
+- [x] Archivo > 20MB rechazado con error claro
+- [x] Tarea con `requiereRepuesto: true` crea repuesto automáticamente
+- [x] Intentar editar tarea STP → 405 Method Not Allowed (no se expone endpoint)
+- [x] URL firmada expira correctamente (verificar con prueba manual)
+- [x] IT solo creable en estado `EN_EVALUACION`

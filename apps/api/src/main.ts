@@ -16,10 +16,12 @@ async function bootstrap() {
     }),
   );
 
+  const allowedOrigins = process.env.NODE_ENV === 'production'
+    ? [process.env.FRONTEND_URL ?? 'http://localhost:3000']
+    : ['http://localhost:3000', 'http://127.0.0.1:3000'];
+
   app.enableCors({
-    origin: process.env.NODE_ENV === 'production'
-      ? process.env.FRONTEND_URL
-      : 'http://localhost:3000',
+    origin: allowedOrigins,
     credentials: true,
   });
 
