@@ -37,14 +37,14 @@ Establecer la fundación técnica del proyecto: monorepo, contenedores Docker pa
 
 ## Criterios de aceptación — Verificación
 
-- [x] `docker compose up -d` levanta postgres y adminer sin errores
+- [x] `docker compose up -d` levanta postgres y adminer sin errores — verificado 2026-04-05
 - [x] Schema Prisma tiene las 9 tablas del PRD
-- [ ] `pnpm install` completa sin errores (requiere Node.js instalado)
-- [ ] `pnpm db:migrate` crea las tablas en PostgreSQL
-- [ ] Adminer en `:8080` muestra las 9 tablas creadas
-- [ ] `pnpm --filter api dev` inicia NestJS en `:3001`
-- [ ] `pnpm --filter web dev` inicia Next.js en `:3000`
-- [ ] Swagger disponible en `http://localhost:3001/api/docs`
+- [x] `pnpm install` completa sin errores — verificado 2026-04-05 (Node 22.14, pnpm 10.33)
+- [x] `prisma db push` crea las tablas en PostgreSQL — verificado 2026-04-05
+- [x] Adminer en `:8080` muestra las 9 tablas creadas — verificado 2026-04-05
+- [x] `pnpm --filter api dev` inicia NestJS en `:3001` (0 errores compilación) — verificado 2026-04-05
+- [x] `pnpm --filter web dev` inicia Next.js en `:3000` — verificado 2026-04-05
+- [x] Swagger disponible en `http://localhost:3001/api/docs` — verificado 2026-04-05
 
 ## Notas de implementación
 

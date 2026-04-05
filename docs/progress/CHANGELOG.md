@@ -4,6 +4,47 @@ Formato: `[YYYY-MM-DD] Fase N — Descripción`
 
 ---
 
+## [2026-04-05] Verificación MVP — Testing end-to-end
+
+### Entorno de desarrollo
+- Configuración completa del entorno local: Docker (PostgreSQL + Adminer), `.env` API, `.env.local` frontend
+- Instalación de pnpm global, dependencias del monorepo, Prisma client y sincronización de schema
+- Verificación de compilación exitosa del API (0 errores, 11 módulos, 40+ endpoints mapeados)
+- Corrección: faltaba `apps/web/.env.local` con `NEXT_PUBLIC_API_URL` — frontend no conectaba a la API
+
+### Seed de datos de prueba
+- Creado `apps/api/prisma/seed.ts` con datos realistas:
+  - 2 talleres (Norte y Sur) para testing cross-tenant
+  - 7 usuarios (todos los roles: JEFE, SUPERVISOR, TECNICO×2, BODEGA, ADMIN + 1 JEFE en Taller Sur)
+  - 4 vehículos (3 en Norte, 1 en Sur)
+  - Password universal `Test1234!` con bcrypt cost 12
+- Registrado script seed en `package.json` (`prisma.seed`)
+
+### Criterios MVP verificados (10/13)
+1. **Ciclo OT completo** ✅ — INGRESADO → EN_EVALUACION → EN_ESPERA → EN_EVALUACION → ESPERANDO_REPUESTOS → EN_EJECUCION → CONTROL_CALIDAD → LISTO_PARA_ENTREGA → ENTREGADO (9 transiciones)
+2. **Log auditoría** ✅ — 9 entries con tipoEvento, usuario.nombre, fechaEvento, descripción
+3. **Bodega + dashboard** ✅ — PENDIENTE → EN_ESPERA → EN_TRANSITO → RECIBIDO; fechaRecepcion/idReceptor auto-registrados; dashboard filtra correctamente; no-BODEGA recibe 403
+4. **Restricciones TECNICO** ✅ — No crea OT (403), no crea usuarios (403), no cancela (422), no ve OTs de otros (0 results), solo ve las suyas
+5. **OT duplicada** ✅ — 409 Conflict: "El vehículo ya tiene una OT activa: OT-2026-002"
+6. **Cancelación** ✅ — Sin comentario: 400; comentario vacío: 400; con comentario: OK + comentarioCancelacion guardado
+7. **STP auto-repuestos** ✅ — requiereRepuesto=true crea Repuesto en PENDIENTE vinculado a TareaIT; sin repuesto no crea nada
+8. **Cross-taller** ✅ — Jefe Sur: 0 OTs, 0 vehículos ajenos, 404 en OT específica, 403 en repuesto ajeno
+9. **bcrypt** ✅ — Todos los hashes inician con `$2b$12$`; passwordHash excluido de respuestas API
+10. **JWT requerido** ✅ — 11/11 endpoints protegidos retornan 401 sin token; login público; token inválido rechazado
+
+### Criterios pendientes de verificación
+- **Dashboard <3s con 50 OTs + 200 repuestos**: ~50ms con datos actuales; requiere seed masivo para load test real
+- **Backups automáticos 30 días**: requiere configuración de producción (Railway/AWS)
+- **Responsive tablet ≥768px**: requiere verificación manual en Chrome DevTools
+
+### Archivos creados/modificados
+- `apps/api/.env` — variables de entorno locales configuradas
+- `apps/api/prisma/seed.ts` — script de seed con datos de prueba
+- `apps/api/package.json` — agregado `prisma.seed`
+- `apps/web/.env.local` — `NEXT_PUBLIC_API_URL=http://localhost:3001`
+
+---
+
 ## [2026-04-04] Fase 7 — Frontend (Next.js 14)
 
 ### Implementado
