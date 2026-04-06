@@ -1,5 +1,6 @@
-import { IsInt, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { TipoServicio } from '@prisma/client';
 
 export class CreateOrdenDto {
   @ApiProperty({ description: 'ID del vehículo' })
@@ -10,6 +11,11 @@ export class CreateOrdenDto {
   @IsOptional()
   @IsString()
   idTecnico?: string;
+
+  @ApiPropertyOptional({ enum: TipoServicio, description: 'Tipo de servicio' })
+  @IsOptional()
+  @IsEnum(TipoServicio)
+  tipoServicio?: TipoServicio;
 
   @ApiPropertyOptional({ description: 'Motivo de ingreso / descripción inicial' })
   @IsOptional()

@@ -1,14 +1,16 @@
 'use client';
 
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { FileText, Package, Plus } from 'lucide-react';
+import { FileText, Package, Plus, Check, Pencil } from 'lucide-react';
 import { api } from '@/lib/api';
 import { getUser } from '@/lib/auth';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -24,6 +26,420 @@ const ESTADO_LABELS: Record<string, string> = {
   LISTO_PARA_ENTREGA: 'Listo p/ Entrega', ENTREGADO: 'Entregado',
   CANCELADO: 'Cancelado', EN_ESPERA: 'En Espera',
 };
+
+const REPUESTO_VARIANT: Record<string, 'default' | 'warning' | 'success' | 'destructive' | 'info' | 'secondary'> = {
+  PENDIENTE: 'secondary',
+  EN_ESPERA: 'warning',
+  EN_TRANSITO: 'info',
+  RECIBIDO: 'success',
+};
+
+function formatDateShort(date: string) {
+  return new Date(date).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' });
+}
+
+// ─── Tipos ────────────────────────────────────────────────────────────────────
+
+interface TareaIT {
+  id: string;
+  numero: number;
+  componente: string;
+  descripcion: string;
+  requiereRepuesto: boolean;
+  completada: boolean;
+  creadoEn: string;
+  updatedAt: string;
+  repuesto?: { id: string; estado: string; descripcion: string } | null;
+}
+
+interface IT {
+  id: string;
+  tareas: TareaIT[];
+}
+
+// ─── Inline editable field ────────────────────────────────────────────────────
+
+function InlineEdit({
+  value,
+  onSave,
+  disabled,
+  className = '',
+}: {
+  value: string;
+  onSave: (v: string) => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const save = () => {
+    setEditing(false);
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== value) onSave(trimmed);
+    else setDraft(value);
+  };
+
+  if (disabled || !editing) {
+    return (
+      <span
+        className={`cursor-pointer rounded px-1 py-0.5 hover:bg-muted ${className}`}
+        onClick={() => {
+          if (disabled) return;
+          setEditing(true);
+          setDraft(value);
+          setTimeout(() => inputRef.current?.focus(), 0);
+        }}
+      >
+        {value}
+      </span>
+    );
+  }
+
+  return (
+    <Input
+      ref={inputRef}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={save}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') save();
+        if (e.key === 'Escape') { setEditing(false); setDraft(value); }
+      }}
+      className={`h-7 px-1 py-0 text-sm ${className}`}
+      autoFocus
+    />
+  );
+}
+
+// ─── Checklist de Tareas STP ──────────────────────────────────────────────────
+
+function TareasSTPChecklist({ idOT, canEdit, esEstadoFinal }: { idOT: string; canEdit: boolean; esEstadoFinal: boolean }) {
+  const queryClient = useQueryClient();
+  const [newComponente, setNewComponente] = useState('');
+  const [newDescripcion, setNewDescripcion] = useState('');
+  const [newRepuesto, setNewRepuesto] = useState(false);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+  const [bulkPreview, setBulkPreview] = useState<{ numero: number; componente: string; descripcion: string }[]>([]);
+  const editable = canEdit && !esEstadoFinal;
+
+  const { data: it } = useQuery<IT | null>({
+    queryKey: ['it', idOT],
+    queryFn: async () => {
+      try {
+        const { data } = await api.get(`/ordenes/${idOT}/it`);
+        return data;
+      } catch {
+        return null;
+      }
+    },
+  });
+
+  const updateTarea = useMutation({
+    mutationFn: ({ idTarea, body }: { idTarea: string; body: Record<string, unknown> }) =>
+      api.patch(`/ordenes/${idOT}/it/tareas/${idTarea}`, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['it', idOT] }),
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Error';
+      toast.error(msg);
+    },
+  });
+
+  const crearTarea = useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api.post(`/ordenes/${idOT}/it/tareas`, body),
+    onSuccess: () => {
+      setNewComponente('');
+      setNewDescripcion('');
+      setNewRepuesto(false);
+      queryClient.invalidateQueries({ queryKey: ['it', idOT] });
+      toast.success('Tarea agregada');
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Error';
+      toast.error(msg);
+    },
+  });
+
+  const bulkCrear = useMutation({
+    mutationFn: (body: { tareas: Record<string, unknown>[] }) =>
+      api.post(`/ordenes/${idOT}/it/tareas-bulk`, body),
+    onSuccess: () => {
+      setBulkText('');
+      setBulkPreview([]);
+      setBulkMode(false);
+      queryClient.invalidateQueries({ queryKey: ['it', idOT] });
+      toast.success('Tareas importadas');
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Error al importar';
+      toast.error(msg);
+    },
+  });
+
+  const tareas = it?.tareas ?? [];
+  const completadas = tareas.filter((t) => t.completada).length;
+
+  const handleAdd = () => {
+    if (!newComponente.trim() || !newDescripcion.trim()) return;
+    const nextNumero = tareas.length > 0 ? Math.max(...tareas.map((t) => t.numero)) + 1 : 1;
+    crearTarea.mutate({
+      numero: nextNumero,
+      componente: newComponente.trim(),
+      descripcion: newDescripcion.trim(),
+      requiereRepuesto: newRepuesto,
+    });
+  };
+
+  // Parse pasted text: expects tab-separated columns from Excel
+  // Format: Componente\tDescripción (2 cols) or #\tComponente\tDescripción (3 cols)
+  const parseBulkText = (text: string) => {
+    const baseNumero = tareas.length > 0 ? Math.max(...tareas.map((t) => t.numero)) + 1 : 1;
+    const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+    const parsed: { numero: number; componente: string; descripcion: string }[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const cols = lines[i].split('\t');
+      if (cols.length >= 3 && !isNaN(Number(cols[0]))) {
+        // 3+ cols: numero, componente, descripcion
+        parsed.push({ numero: Number(cols[0]) || baseNumero + i, componente: cols[1].trim(), descripcion: cols.slice(2).join(' ').trim() });
+      } else if (cols.length >= 2) {
+        // 2 cols: componente, descripcion
+        parsed.push({ numero: baseNumero + i, componente: cols[0].trim(), descripcion: cols.slice(1).join(' ').trim() });
+      } else if (cols[0].trim()) {
+        // 1 col: treat as descripcion with generic componente
+        parsed.push({ numero: baseNumero + i, componente: 'General', descripcion: cols[0].trim() });
+      }
+    }
+    return parsed.filter((p) => p.componente && p.descripcion);
+  };
+
+  const handleBulkTextChange = (text: string) => {
+    setBulkText(text);
+    setBulkPreview(parseBulkText(text));
+  };
+
+  const handleBulkImport = () => {
+    if (bulkPreview.length === 0) return;
+    bulkCrear.mutate({
+      tareas: bulkPreview.map((t) => ({
+        numero: t.numero,
+        componente: t.componente,
+        descripcion: t.descripcion,
+        requiereRepuesto: false,
+      })),
+    });
+  };
+
+  if (!it) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Tareas STP</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Carga el Informe Técnico para habilitar las tareas STP.
+          </p>
+          <Link href={`/ots/${idOT}/it`}>
+            <Button variant="outline" size="sm" className="mt-2">
+              <FileText className="mr-2 h-4 w-4" />
+              Cargar IT
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">
+            Tareas STP
+            {tareas.length > 0 && (
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                ({completadas}/{tareas.length} completadas)
+              </span>
+            )}
+          </CardTitle>
+          <Link href={`/ots/${idOT}/it`}>
+            <Button variant="ghost" size="sm" className="text-xs">
+              <FileText className="mr-1 h-3 w-3" />
+              Ver IT
+            </Button>
+          </Link>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="divide-y">
+          {tareas.map((t) => (
+            <div
+              key={t.id}
+              className={`flex items-start gap-3 px-4 py-3 transition-colors ${t.completada ? 'bg-muted/40' : ''}`}
+            >
+              {/* Checkbox */}
+              <button
+                type="button"
+                disabled={!editable}
+                onClick={() =>
+                  updateTarea.mutate({
+                    idTarea: t.id,
+                    body: { completada: !t.completada },
+                  })
+                }
+                className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
+                  t.completada
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-input hover:border-primary'
+                } ${!editable ? 'opacity-50' : 'cursor-pointer'}`}
+              >
+                {t.completada && <Check className="h-3 w-3" />}
+              </button>
+
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <div className={`flex items-center gap-2 ${t.completada ? 'line-through text-muted-foreground' : ''}`}>
+                  <InlineEdit
+                    value={t.componente}
+                    disabled={!editable}
+                    onSave={(v) => updateTarea.mutate({ idTarea: t.id, body: { componente: v } })}
+                    className="font-medium text-sm"
+                  />
+                  <span className="text-muted-foreground">—</span>
+                  <InlineEdit
+                    value={t.descripcion}
+                    disabled={!editable}
+                    onSave={(v) => updateTarea.mutate({ idTarea: t.id, body: { descripcion: v } })}
+                    className="text-sm"
+                  />
+                </div>
+                <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                  {t.requiereRepuesto && t.repuesto ? (
+                    <Badge variant={REPUESTO_VARIANT[t.repuesto.estado] ?? 'secondary'} className="text-[10px] px-1.5 py-0">
+                      {t.repuesto.estado}
+                    </Badge>
+                  ) : t.requiereRepuesto ? (
+                    <Badge variant="destructive" className="text-[10px] px-1.5 py-0">SIN REPUESTO</Badge>
+                  ) : null}
+                  <span>Creada {formatDateShort(t.creadoEn)}</span>
+                  {t.updatedAt !== t.creadoEn && (
+                    <span>· Mod. {formatDateShort(t.updatedAt)}</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Task number */}
+              <span className="shrink-0 text-xs text-muted-foreground">#{t.numero}</span>
+            </div>
+          ))}
+
+          {tareas.length === 0 && !editable && (
+            <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+              Sin tareas STP registradas
+            </p>
+          )}
+
+          {/* Add row / Bulk import */}
+          {editable && !bulkMode && (
+            <div className="flex items-center gap-2 px-4 py-3 bg-muted/20">
+              <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <Input
+                placeholder="Componente"
+                value={newComponente}
+                onChange={(e) => setNewComponente(e.target.value)}
+                className="h-8 text-sm flex-1"
+                onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+              />
+              <Input
+                placeholder="Descripción de la tarea"
+                value={newDescripcion}
+                onChange={(e) => setNewDescripcion(e.target.value)}
+                className="h-8 text-sm flex-[2]"
+                onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+              />
+              <label className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={newRepuesto}
+                  onChange={(e) => setNewRepuesto(e.target.checked)}
+                  className="h-3.5 w-3.5"
+                />
+                Rep.
+              </label>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 px-2"
+                disabled={!newComponente.trim() || !newDescripcion.trim() || crearTarea.isPending}
+                onClick={handleAdd}
+              >
+                {crearTarea.isPending ? '...' : 'Agregar'}
+              </Button>
+              <div className="border-l pl-2 ml-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 px-2 text-xs"
+                  onClick={() => setBulkMode(true)}
+                >
+                  Pegar desde Excel
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {editable && bulkMode && (
+            <div className="px-4 py-3 space-y-3 bg-muted/20 border-t">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Importar tareas desde Excel</p>
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setBulkMode(false); setBulkText(''); setBulkPreview([]); }}>
+                  Cancelar
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Copia las columnas desde Excel y pega aqui. Formato: <span className="font-mono bg-muted px-1 rounded">Componente [Tab] Descripcion</span> por fila.
+              </p>
+              <textarea
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono min-h-[100px] resize-y focus:outline-none focus:ring-2 focus:ring-ring"
+                placeholder={"Motor hidraulico\tReemplazo sello principal\nSistema electrico\tRevision cableado cabina\nFiltros\tCambio filtro aire y aceite"}
+                value={bulkText}
+                onChange={(e) => handleBulkTextChange(e.target.value)}
+              />
+              {bulkPreview.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">{bulkPreview.length} tareas detectadas:</p>
+                  <div className="max-h-32 overflow-y-auto rounded border bg-background text-xs divide-y">
+                    {bulkPreview.map((p, i) => (
+                      <div key={i} className="flex gap-3 px-3 py-1.5">
+                        <span className="text-muted-foreground w-6">#{p.numero}</span>
+                        <span className="font-medium w-32 truncate">{p.componente}</span>
+                        <span className="flex-1 truncate">{p.descripcion}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    disabled={bulkCrear.isPending}
+                    onClick={handleBulkImport}
+                  >
+                    {bulkCrear.isPending ? 'Importando...' : `Importar ${bulkPreview.length} tareas`}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Página principal ─────────────────────────────────────────────────────────
 
 export default function OtDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -111,6 +527,9 @@ export default function OtDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Checklist Tareas STP */}
+      <TareasSTPChecklist idOT={id} canEdit={!!canEdit} esEstadoFinal={esEstadoFinal} />
 
       <div className="flex gap-3">
         <Link href={`/ots/${id}/it`}>

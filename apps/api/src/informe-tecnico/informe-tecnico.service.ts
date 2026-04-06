@@ -16,6 +16,8 @@ import {
 } from './dto/presigned-url.dto';
 import { CreateInformeTecnicoDto } from './dto/create-it.dto';
 import { CreateTareaITDto } from './dto/create-tarea-it.dto';
+import { UpdateTareaITDto } from './dto/update-tarea-it.dto';
+import { BulkCreateTareasDto } from './dto/bulk-create-tareas.dto';
 
 @Injectable()
 export class InformeTecnicoService {
@@ -171,6 +173,84 @@ export class InformeTecnicoService {
         where: { id: tarea.id },
         include: { repuesto: true },
       });
+    });
+  }
+
+  // ─── Bulk Create Tareas STP ────────────────────────────────────────────────
+
+  async bulkCrearTareas(idOT: string, idTaller: string, dto: BulkCreateTareasDto) {
+    const ot = await this.prisma.ordenTrabajo.findFirst({
+      where: { id: idOT, idTaller },
+      include: { informeTecnico: { select: { id: true } } },
+    });
+    if (!ot) throw new NotFoundException('Orden de trabajo no encontrada');
+    if (!ot.informeTecnico) {
+      throw new UnprocessableEntityException(
+        'Debes cargar el Informe Técnico antes de registrar tareas STP.',
+      );
+    }
+    if (ot.estado === EstadoOT.ENTREGADO || ot.estado === EstadoOT.CANCELADO) {
+      throw new UnprocessableEntityException(
+        'No se pueden agregar tareas a una OT en estado final.',
+      );
+    }
+
+    const idIT = ot.informeTecnico.id;
+
+    return this.prisma.$transaction(async (tx) => {
+      const created: unknown[] = [];
+      for (const item of dto.tareas) {
+        const tarea = await tx.tareaIT.create({
+          data: {
+            idIT,
+            numero: item.numero,
+            componente: item.componente,
+            descripcion: item.descripcion,
+            requiereRepuesto: item.requiereRepuesto,
+          },
+          include: { repuesto: true },
+        });
+        created.push(tarea);
+      }
+      return created;
+    });
+  }
+
+  // ─── Actualizar Tarea STP ──────────────────────────────────────────────────
+
+  async actualizarTarea(
+    idOT: string,
+    idTarea: string,
+    idTaller: string,
+    dto: UpdateTareaITDto,
+  ) {
+    const ot = await this.prisma.ordenTrabajo.findFirst({
+      where: { id: idOT, idTaller },
+      include: { informeTecnico: { select: { id: true } } },
+    });
+    if (!ot) throw new NotFoundException('Orden de trabajo no encontrada');
+    if (ot.estado === EstadoOT.ENTREGADO || ot.estado === EstadoOT.CANCELADO) {
+      throw new UnprocessableEntityException(
+        'No se pueden modificar tareas de una OT en estado final.',
+      );
+    }
+    if (!ot.informeTecnico) {
+      throw new NotFoundException('Esta OT no tiene Informe Técnico.');
+    }
+
+    const tarea = await this.prisma.tareaIT.findFirst({
+      where: { id: idTarea, idIT: ot.informeTecnico.id },
+    });
+    if (!tarea) throw new NotFoundException('Tarea no encontrada');
+
+    return this.prisma.tareaIT.update({
+      where: { id: idTarea },
+      data: {
+        ...(dto.componente !== undefined && { componente: dto.componente }),
+        ...(dto.descripcion !== undefined && { descripcion: dto.descripcion }),
+        ...(dto.completada !== undefined && { completada: dto.completada }),
+      },
+      include: { repuesto: true },
     });
   }
 

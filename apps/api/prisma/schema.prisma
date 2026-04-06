@@ -44,6 +44,15 @@ enum OrigenRepuesto {
   TALLER  // Stock interno
 }
 
+enum TipoServicio {
+  MANTENCION_PREVENTIVA
+  MANTENCION_CORRECTIVA
+  REPARACION_MAYOR
+  INSPECCION
+  GARANTIA
+  OTRO
+}
+
 enum TipoEventoLog {
   CAMBIO_ESTADO
   SUBIDA_IT
@@ -118,7 +127,8 @@ model OrdenTrabajo {
   idVehiculo       String    @map("id_vehiculo")
   idTecnico        String?   @map("id_tecnico")
   numeroOT         String    @map("numero_ot")   // formato: OT-YYYY-NNN
-  estado           EstadoOT  @default(INGRESADO)
+  estado           EstadoOT     @default(INGRESADO)
+  tipoServicio     TipoServicio? @map("tipo_servicio")
   descripcion      String?   // motivo de ingreso inicial
   kilometraje      Int?      // odómetro al ingreso
   kilometrajeSalida Int?     @map("kilometraje_salida")
@@ -166,8 +176,9 @@ model TareaIT {
   componente       String
   descripcion      String
   requiereRepuesto Boolean  @default(false) @map("requiere_repuesto")
+  completada       Boolean  @default(false)
   creadoEn         DateTime @default(now()) @map("creado_en")
-  // Inmutable post-registro: sin updatedAt
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   informeTecnico   InformeTecnico @relation(fields: [idIT], references: [id])
   repuesto         Repuesto?      // auto-creado si requiereRepuesto = true

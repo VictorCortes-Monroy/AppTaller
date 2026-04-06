@@ -1,8 +1,10 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
+  LayoutDashboard,
   ClipboardList,
   Package,
   History,
@@ -12,10 +14,17 @@ import {
   Wrench,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { clearTokens, getUser } from '@/lib/auth';
+import { clearTokens, getUser, TokenPayload } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 
 const NAV_ITEMS = [
+  {
+    href: '/',
+    label: 'Inicio',
+    icon: LayoutDashboard,
+    roles: ['JEFE', 'SUPERVISOR', 'ADMIN'],
+    exact: true,
+  },
   {
     href: '/ots',
     label: 'Órdenes de Trabajo',
@@ -51,7 +60,11 @@ const NAV_ITEMS = [
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const user = getUser();
+  const [user, setUser] = useState<TokenPayload | null>(null);
+
+  useEffect(() => {
+    setUser(getUser());
+  }, []);
 
   const handleLogout = () => {
     clearTokens();
@@ -71,13 +84,17 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {visibleItems.map((item) => (
+        {visibleItems.map((item) => {
+          const isActive = ('exact' in item && item.exact)
+            ? pathname === item.href
+            : pathname.startsWith(item.href);
+          return (
           <Link
             key={item.href}
             href={item.href}
             className={cn(
               'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-              pathname.startsWith(item.href)
+              isActive
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:bg-muted hover:text-foreground',
             )}
@@ -85,7 +102,8 @@ export function Sidebar() {
             <item.icon className="h-4 w-4" />
             {item.label}
           </Link>
-        ))}
+          );
+        })}
       </nav>
 
       <div className="border-t p-4 space-y-2">

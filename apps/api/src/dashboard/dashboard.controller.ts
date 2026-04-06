@@ -14,6 +14,13 @@ import { CurrentTaller } from '../auth/decorators/current-taller.decorator';
 export class DashboardController {
   constructor(private service: DashboardService) {}
 
+  @Get('resumen')
+  @Roles(RolUsuario.JEFE, RolUsuario.SUPERVISOR, RolUsuario.ADMIN)
+  @ApiOperation({ summary: 'Resumen general: KPIs, distribución por estado/tipo, actividad reciente' })
+  getResumen(@CurrentTaller() idTaller: string) {
+    return this.service.getResumen(idTaller);
+  }
+
   @Get('ots-activas')
   @Roles(RolUsuario.JEFE, RolUsuario.SUPERVISOR, RolUsuario.ADMIN)
   @ApiOperation({

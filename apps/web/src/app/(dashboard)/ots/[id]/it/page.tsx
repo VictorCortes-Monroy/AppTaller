@@ -60,12 +60,14 @@ export default function ITPage() {
       const { data: presigned } = await api.get(`/ordenes/${id}/it/presigned-url`, {
         params: { fileName: formData.file.name },
       });
-      // 2. Subir archivo a S3
-      await fetch(presigned.presignedUrl, {
-        method: 'PUT',
-        body: formData.file,
-        headers: { 'Content-Type': formData.file.type },
-      });
+      // 2. Subir archivo a S3 (skip if fake URL in dev mode)
+      if (!presigned.presignedUrl.includes('fake-s3.local')) {
+        await fetch(presigned.presignedUrl, {
+          method: 'PUT',
+          body: formData.file,
+          headers: { 'Content-Type': formData.file.type },
+        });
+      }
       // 3. Confirmar IT
       const { data } = await api.post(`/ordenes/${id}/it`, {
         key: presigned.key,
