@@ -10,6 +10,7 @@ import { InformeTecnicoModule } from './informe-tecnico/informe-tecnico.module';
 import { RepuestosModule } from './repuestos/repuestos.module';
 import { TareasAdicionalesModule } from './tareas-adicionales/tareas-adicionales.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { ClientesModule } from './clientes/clientes.module';
 
 @Module({
   imports: [
@@ -23,6 +24,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
     // ─── Fase 1 ───────────────────────────────
     AuthModule,
     UsersModule,
+    // ─── Clientes ─────────────────────────────
+    ClientesModule,
     // ─── Fase 2 ───────────────────────────────
     VehiculosModule,
     OrdenesModule,

@@ -4,6 +4,7 @@ import { RolUsuario } from '@prisma/client';
 import { VehiculosService } from './vehiculos.service';
 import { CreateVehiculoDto } from './dto/create-vehiculo.dto';
 import { UpdateVehiculoDto } from './dto/update-vehiculo.dto';
+import { BulkCreateVehiculoDto } from './dto/bulk-create-vehiculo.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -21,6 +22,13 @@ export class VehiculosController {
   @ApiOperation({ summary: 'Registrar vehículo (VIN único por taller)' })
   create(@CurrentTaller() idTaller: string, @Body() dto: CreateVehiculoDto) {
     return this.vehiculosService.create(idTaller, dto);
+  }
+
+  @Post('bulk')
+  @Roles(RolUsuario.JEFE, RolUsuario.SUPERVISOR)
+  @ApiOperation({ summary: 'Importar vehículos en lote desde Excel (max 500)' })
+  bulkCreate(@CurrentTaller() idTaller: string, @Body() dto: BulkCreateVehiculoDto) {
+    return this.vehiculosService.bulkCreate(idTaller, dto);
   }
 
   @Get()

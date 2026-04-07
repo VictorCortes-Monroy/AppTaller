@@ -1,6 +1,6 @@
 # WorkShop Manager — Roadmap de Desarrollo
 
-> Actualizado: 2026-04-05
+> Actualizado: 2026-04-06
 
 ## Estado general
 
@@ -14,6 +14,8 @@
 | **5** | Tareas Adicionales (costos, trazabilidad) | ✅ Completado | 2026-04-04 |
 | **6** | Dashboard y Log de Auditoría (3 vistas) | ✅ Completado | 2026-04-04 |
 | **7** | Frontend (Next.js 14, App Router, shadcn/ui) | ✅ Completado | 2026-04-04 |
+| **8** | Mejoras UX: Dashboard, Kanban, Timeline, Bulk Import | ✅ Completado | 2026-04-05 |
+| **9** | Módulo de Gestión de Clientes | ✅ Completado | 2026-04-06 |
 
 ## Criterios de MVP completado
 

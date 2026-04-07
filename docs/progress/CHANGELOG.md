@@ -4,6 +4,63 @@ Formato: `[YYYY-MM-DD] Fase N — Descripción`
 
 ---
 
+## [2026-04-06] Fase 9 — Módulo de Gestión de Clientes
+
+### Modelo de datos
+- Nuevo modelo `Cliente` en Prisma: nombre, RUT, dirección, contacto, teléfono, email, activo
+- Constraint único `@@unique([idTaller, nombre])` para evitar duplicados por taller
+- FK `idCliente` (nullable) en Vehiculo con relación `clienteRef`
+- Script de migración `migrate-clientes.ts`: creó clientes desde strings existentes y vinculó vehículos
+
+### Backend
+- `ClientesModule` completo: 4 endpoints (POST, GET, GET/:id, PATCH/:id)
+- `findAll()` con stats agregados via raw SQL: vehiculosCount, totalServicios, ultimoServicio
+- `findOne()` con detalle completo: vehículos (con count OTs) + últimas 50 OTs + resumen
+- `resolveCliente()` en VehiculosService: auto-busca o crea Cliente al crear vehículos
+- Seed actualizado con 3 clientes empresariales (Pelambres, Escondida, Collahuasi)
+
+### Frontend
+- Sidebar: item "Clientes" con icono Building2 (roles: JEFE, SUPERVISOR, ADMIN)
+- `/clientes`: KPI cards + buscador + tabla con stats + dialog "Nuevo Cliente" (Zod)
+- `/clientes/[id]`: header con datos empresa, KPI cards, tabla vehículos, historial de servicios (clickeable a OT)
+
+---
+
+## [2026-04-05] Fase 8 — Mejoras de UX y Funcionalidades Avanzadas
+
+### Dashboard de Monitoreo
+- Página de inicio con KPI cards, gráficos Recharts (barras y pie), tabla de prioridad, donut de repuestos
+- Consume `GET /dashboard/resumen`
+
+### Kanban de OTs
+- Tablero kanban de 7 columnas por estado, reemplaza vista tabla
+- `OTKanbanCard` con N° OT, vehículo, cliente, técnico, días en taller
+- Barra de filtros: búsqueda + filtros por estado, marca, técnico
+
+### Formulario de OT mejorado
+- Flujo cliente-primero: seleccionar cliente → filtrar vehículos → tipo servicio → técnico
+- Fix de dropdowns transparentes (CSS variables `--popover`)
+
+### Timeline de Progreso de OT
+- Stepper horizontal con 7 pasos del flujo + timestamps del log de auditoría
+- Manejo visual de EN_ESPERA y CANCELADO
+
+### Checklist STP Interactivo
+- Tareas inline con toggle de completado, fechas, edición in-place (estilo Monday.com)
+- Bulk paste desde Excel para tareas STP
+
+### Importación Masiva de Vehículos
+- `POST /vehiculos/bulk` con validación de VINs duplicados
+- `BulkImportDialog`: upload Excel, parsing SheetJS, preview con validación, plantilla descargable
+
+### Fixes técnicos
+- Hydration errors: useState + useEffect para getUser()
+- Redirect loop en `/`: eliminado `app/page.tsx`
+- TypeScript: `Array.from(new Set(...))` en vez de spread
+- CSS: variables `--popover` y `--popover-foreground` en globals.css
+
+---
+
 ## [2026-04-05] Verificación MVP — Testing end-to-end
 
 ### Entorno de desarrollo

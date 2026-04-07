@@ -75,18 +75,61 @@ async function main() {
   });
   console.log(`  ✓ Usuario Sur: ${jefeSur.nombre} (${jefeSur.rol})`);
 
+  // ─── Clientes Taller Norte ───────────────────────────────────────────────
+  const pelambres = await prisma.cliente.upsert({
+    where: { idTaller_nombre: { idTaller: tallerNorte.id, nombre: 'Minera Los Pelambres' } },
+    update: {},
+    create: {
+      idTaller: tallerNorte.id,
+      nombre: 'Minera Los Pelambres',
+      rut: '76.333.333-3',
+      contacto: 'Juan Pérez',
+      telefono: '+56 9 1234 5678',
+      email: 'contacto@pelambres.cl',
+      direccion: 'Ruta 5 Norte Km 200, Salamanca',
+    },
+  });
+  console.log(`  ✓ Cliente: ${pelambres.nombre}`);
+
+  const escondida = await prisma.cliente.upsert({
+    where: { idTaller_nombre: { idTaller: tallerNorte.id, nombre: 'Minera Escondida' } },
+    update: {},
+    create: {
+      idTaller: tallerNorte.id,
+      nombre: 'Minera Escondida',
+      rut: '76.444.444-4',
+      contacto: 'María González',
+      telefono: '+56 9 8765 4321',
+      email: 'operaciones@escondida.cl',
+      direccion: 'Desierto de Atacama, Antofagasta',
+    },
+  });
+  console.log(`  ✓ Cliente: ${escondida.nombre}`);
+
+  const collahuasi = await prisma.cliente.upsert({
+    where: { idTaller_nombre: { idTaller: tallerSur.id, nombre: 'Minera Collahuasi' } },
+    update: {},
+    create: {
+      idTaller: tallerSur.id,
+      nombre: 'Minera Collahuasi',
+      rut: '76.555.555-5',
+      contacto: 'Carlos Rojas',
+    },
+  });
+  console.log(`  ✓ Cliente Sur: ${collahuasi.nombre}`);
+
   // ─── Vehículos Taller Norte ────────────────────────────────────────────────
   const vehiculosNorte = [
-    { marca: 'Komatsu', modelo: 'PC200', numeroSerie: 'KMTPC200AAA000001', cliente: 'Minera Los Pelambres' },
-    { marca: 'Komatsu', modelo: 'HD785', numeroSerie: 'KMTHD785BBB000002', cliente: 'Minera Los Pelambres' },
-    { marca: 'Caterpillar', modelo: '797F', numeroSerie: 'CATF797FCCC000003', cliente: 'Minera Escondida' },
+    { marca: 'Komatsu', modelo: 'PC200', numeroSerie: 'KMTPC200AAA000001', cliente: 'Minera Los Pelambres', idCliente: pelambres.id },
+    { marca: 'Komatsu', modelo: 'HD785', numeroSerie: 'KMTHD785BBB000002', cliente: 'Minera Los Pelambres', idCliente: pelambres.id },
+    { marca: 'Caterpillar', modelo: '797F', numeroSerie: 'CATF797FCCC000003', cliente: 'Minera Escondida', idCliente: escondida.id },
   ];
 
   const createdVehiculos: any[] = [];
   for (const v of vehiculosNorte) {
     const vehiculo = await prisma.vehiculo.upsert({
       where: { idTaller_numeroSerie: { idTaller: tallerNorte.id, numeroSerie: v.numeroSerie } },
-      update: {},
+      update: { idCliente: v.idCliente },
       create: {
         idTaller: tallerNorte.id,
         ...v,
@@ -99,9 +142,10 @@ async function main() {
   // ─── Vehículo Taller Sur ──────────────────────────────────────────────────
   const vehiculoSur = await prisma.vehiculo.upsert({
     where: { idTaller_numeroSerie: { idTaller: tallerSur.id, numeroSerie: 'KMTWA600DDD000004' } },
-    update: {},
+    update: { idCliente: collahuasi.id },
     create: {
       idTaller: tallerSur.id,
+      idCliente: collahuasi.id,
       marca: 'Komatsu',
       modelo: 'WA600',
       numeroSerie: 'KMTWA600DDD000004',

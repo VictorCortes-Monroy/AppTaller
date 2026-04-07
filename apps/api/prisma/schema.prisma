@@ -76,8 +76,30 @@ model Taller {
   usuarios        Usuario[]
   vehiculos       Vehiculo[]
   ordenesTrabajo  OrdenTrabajo[]
+  clientes        Cliente[]
 
   @@map("taller")
+}
+
+model Cliente {
+  id        String   @id @default(cuid())
+  idTaller  String   @map("id_taller")
+  rut       String?
+  nombre    String
+  direccion String?
+  contacto  String?
+  telefono  String?
+  email     String?
+  activo    Boolean  @default(true)
+  creadoEn  DateTime @default(now()) @map("creado_en")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  taller    Taller     @relation(fields: [idTaller], references: [id])
+  vehiculos Vehiculo[]
+
+  @@unique([idTaller, nombre])
+  @@index([idTaller])
+  @@map("cliente")
 }
 
 model Usuario {
@@ -104,16 +126,18 @@ model Usuario {
 model Vehiculo {
   id          String   @id @default(cuid())
   idTaller    String   @map("id_taller")
+  idCliente   String?  @map("id_cliente")
   marca       String
   modelo      String
   numeroSerie String   @map("numero_serie") // VIN
-  cliente     String   // empresa/mina propietaria
+  cliente     String   // empresa/mina propietaria (legacy, usar idCliente)
   sucursal    String?
   activo      Boolean  @default(true)
   creadoEn    DateTime @default(now()) @map("creado_en")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   taller         Taller         @relation(fields: [idTaller], references: [id])
+  clienteRef     Cliente?       @relation(fields: [idCliente], references: [id])
   ordenesTrabajo OrdenTrabajo[]
 
   @@unique([idTaller, numeroSerie]) // VIN único por taller

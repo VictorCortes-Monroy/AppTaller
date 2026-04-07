@@ -9,6 +9,7 @@ import {
   Package,
   History,
   Car,
+  Building2,
   Users,
   LogOut,
   Wrench,
@@ -27,7 +28,7 @@ const NAV_ITEMS = [
   },
   {
     href: '/ots',
-    label: 'Órdenes de Trabajo',
+    label: 'Gestión de Actividades',
     icon: ClipboardList,
     roles: ['JEFE', 'SUPERVISOR', 'TECNICO', 'ADMIN'],
   },
@@ -47,6 +48,12 @@ const NAV_ITEMS = [
     href: '/vehiculos',
     label: 'Vehículos',
     icon: Car,
+    roles: ['JEFE', 'SUPERVISOR', 'ADMIN'],
+  },
+  {
+    href: '/clientes',
+    label: 'Clientes',
+    icon: Building2,
     roles: ['JEFE', 'SUPERVISOR', 'ADMIN'],
   },
   {

@@ -5,7 +5,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { FileText, Package, Plus, Check, Pencil } from 'lucide-react';
+import { FileText, Package, Plus, Check, Pencil, XCircle, Pause } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { getUser } from '@/lib/auth';
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +37,184 @@ const REPUESTO_VARIANT: Record<string, 'default' | 'warning' | 'success' | 'dest
 
 function formatDateShort(date: string) {
   return new Date(date).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' });
+}
+
+function formatDateTimeShort(date: string) {
+  return new Date(date).toLocaleString('es-CL', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+// ─── Timeline de progreso ─────────────────────────────────────────────────────
+
+const TIMELINE_STEPS = [
+  'INGRESADO', 'EN_EVALUACION', 'ESPERANDO_REPUESTOS', 'EN_EJECUCION',
+  'CONTROL_CALIDAD', 'LISTO_PARA_ENTREGA', 'ENTREGADO',
+];
+
+const STEP_LABELS: Record<string, string> = {
+  INGRESADO: 'Ingresado',
+  EN_EVALUACION: 'Evaluación',
+  ESPERANDO_REPUESTOS: 'Esp. Repuestos',
+  EN_EJECUCION: 'Ejecución',
+  CONTROL_CALIDAD: 'Control Calidad',
+  LISTO_PARA_ENTREGA: 'Listo Entrega',
+  ENTREGADO: 'Entregado',
+};
+
+interface LogEntry {
+  id: string;
+  tipoEvento: string;
+  estadoAnterior?: string;
+  estadoNuevo?: string;
+  descripcion: string;
+  fechaEvento: string;
+  usuario?: { nombre: string };
+}
+
+function buildStateTimestamps(logs: LogEntry[], creadoEn: string) {
+  const map = new Map<string, { date: string; user: string }>();
+  map.set('INGRESADO', { date: creadoEn, user: '' });
+
+  const sorted = [...logs]
+    .filter((l) => l.tipoEvento === 'CAMBIO_ESTADO' && l.estadoNuevo)
+    .sort((a, b) => new Date(a.fechaEvento).getTime() - new Date(b.fechaEvento).getTime());
+
+  for (const entry of sorted) {
+    if (entry.estadoNuevo && !map.has(entry.estadoNuevo)) {
+      map.set(entry.estadoNuevo, { date: entry.fechaEvento, user: entry.usuario?.nombre ?? '' });
+    }
+  }
+  return map;
+}
+
+function OTProgressTimeline({
+  currentState,
+  logs,
+  creadoEn,
+  canEdit,
+  esEstadoFinal,
+  onChangeState,
+}: {
+  currentState: string;
+  logs: LogEntry[];
+  creadoEn: string;
+  canEdit: boolean;
+  esEstadoFinal: boolean;
+  onChangeState: (v: string) => void;
+}) {
+  const timestamps = buildStateTimestamps(logs, creadoEn);
+
+  // CANCELADO: banner rojo
+  if (currentState === 'CANCELADO') {
+    const cancelEntry = [...logs]
+      .filter((l) => l.estadoNuevo === 'CANCELADO')
+      .sort((a, b) => new Date(b.fechaEvento).getTime() - new Date(a.fechaEvento).getTime())[0];
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 px-5 py-4 flex items-center gap-4">
+        <XCircle className="h-6 w-6 text-red-600 shrink-0" />
+        <div>
+          <p className="text-sm font-semibold text-red-800">Orden Cancelada</p>
+          <p className="text-xs text-red-600">
+            {cancelEntry ? `${formatDateTimeShort(cancelEntry.fechaEvento)}` : ''}
+            {cancelEntry?.usuario?.nombre ? ` por ${cancelEntry.usuario.nombre}` : ''}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // EN_ESPERA: encontrar el step real donde se pausó
+  let effectiveState = currentState;
+  if (currentState === 'EN_ESPERA') {
+    const pauseEntry = [...logs]
+      .filter((l) => l.estadoNuevo === 'EN_ESPERA')
+      .sort((a, b) => new Date(b.fechaEvento).getTime() - new Date(a.fechaEvento).getTime())[0];
+    effectiveState = pauseEntry?.estadoAnterior ?? 'INGRESADO';
+  }
+
+  const currentIdx = TIMELINE_STEPS.indexOf(effectiveState);
+
+  return (
+    <Card>
+      <CardContent className="pt-6 pb-4">
+        {/* Stepper */}
+        <div className="overflow-x-auto">
+          <div className="flex items-start min-w-[600px]">
+            {TIMELINE_STEPS.map((step, i) => {
+              const isCompleted = timestamps.has(step) && i < currentIdx;
+              const isCurrent = step === effectiveState;
+              const isEntregado = step === 'ENTREGADO' && currentState === 'ENTREGADO';
+              const isFuture = !isCompleted && !isCurrent && !isEntregado;
+              const ts = timestamps.get(step);
+
+              return (
+                <div key={step} className="flex items-start flex-1">
+                  <div className="flex flex-col items-center text-center w-full">
+                    {/* Circle */}
+                    <div className={cn(
+                      'w-8 h-8 rounded-full flex items-center justify-center border-2 text-xs font-bold transition-all',
+                      (isCompleted || isEntregado) && 'bg-green-600 border-green-600 text-white',
+                      isCurrent && !isEntregado && 'bg-blue-600 border-blue-600 text-white ring-4 ring-blue-100 scale-110',
+                      isFuture && 'bg-background border-muted-foreground/25 text-muted-foreground',
+                    )}>
+                      {(isCompleted || isEntregado) ? <Check className="h-4 w-4" /> : (i + 1)}
+                    </div>
+
+                    {/* Label */}
+                    <span className={cn(
+                      'mt-2 text-[11px] font-medium leading-tight max-w-[80px]',
+                      (isCompleted || isEntregado) && 'text-green-700',
+                      isCurrent && !isEntregado && 'text-blue-700 font-semibold',
+                      isFuture && 'text-muted-foreground',
+                    )}>
+                      {STEP_LABELS[step]}
+                    </span>
+
+                    {/* Timestamp */}
+                    {ts && (
+                      <span className="mt-0.5 text-[10px] text-muted-foreground">
+                        {formatDateTimeShort(ts.date)}
+                      </span>
+                    )}
+
+                    {/* EN_ESPERA badge */}
+                    {isCurrent && currentState === 'EN_ESPERA' && (
+                      <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                        <Pause className="h-2.5 w-2.5" /> En Espera
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Connecting line */}
+                  {i < TIMELINE_STEPS.length - 1 && (
+                    <div className={cn(
+                      'h-0.5 mt-4 flex-1 min-w-[12px] mx-0.5',
+                      i < currentIdx ? 'bg-green-600' : 'bg-muted-foreground/15',
+                    )} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Cambiar estado */}
+        {canEdit && !esEstadoFinal && (
+          <div className="flex justify-end mt-4 pt-3 border-t">
+            <Select onValueChange={onChangeState}>
+              <SelectTrigger className="w-52">
+                <SelectValue placeholder="Cambiar estado..." />
+              </SelectTrigger>
+              <SelectContent>
+                {ESTADOS_OT.filter((e) => e !== currentState).map((e) => (
+                  <SelectItem key={e} value={e}>{ESTADO_LABELS[e]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -485,29 +664,21 @@ export default function OtDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{ot.numeroOT}</h1>
-          <p className="text-muted-foreground">
-            {ot.vehiculo?.numeroSerie} — {ot.vehiculo?.marca} {ot.vehiculo?.modelo}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Badge variant="secondary">{ESTADO_LABELS[ot.estado] ?? ot.estado}</Badge>
-          {canEdit && !esEstadoFinal && (
-            <Select onValueChange={(v) => cambiarEstado.mutate(v)}>
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="Cambiar estado" />
-              </SelectTrigger>
-              <SelectContent>
-                {ESTADOS_OT.filter((e) => e !== ot.estado).map((e) => (
-                  <SelectItem key={e} value={e}>{ESTADO_LABELS[e]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold">{ot.numeroOT}</h1>
+        <p className="text-muted-foreground">
+          {ot.vehiculo?.numeroSerie} — {ot.vehiculo?.marca} {ot.vehiculo?.modelo}
+        </p>
       </div>
+
+      <OTProgressTimeline
+        currentState={ot.estado}
+        logs={log}
+        creadoEn={ot.creadoEn}
+        canEdit={!!canEdit}
+        esEstadoFinal={esEstadoFinal}
+        onChangeState={(v) => cambiarEstado.mutate(v)}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
