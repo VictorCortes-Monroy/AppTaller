@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { FileText, Package, Plus, Check, Pencil, XCircle, Pause } from 'lucide-react';
+import { FileText, Package, Plus, Check, Pencil, XCircle, Pause, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PARTES_VEHICULO, TIPOS_TRABAJO } from '@/lib/constants';
 import { api } from '@/lib/api';
 import { getUser } from '@/lib/auth';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +16,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 
 const ESTADOS_OT = [
   'INGRESADO', 'EN_EVALUACION', 'ESPERANDO_REPUESTOS', 'EN_EJECUCION',
@@ -361,6 +364,26 @@ function TareasSTPChecklist({ idOT, canEdit, esEstadoFinal }: { idOT: string; ca
   const tareas = it?.tareas ?? [];
   const completadas = tareas.filter((t) => t.completada).length;
 
+  // Agrupar tareas por componente (parte del vehículo)
+  const groupedTareas = useMemo(() => {
+    const groups = new Map<string, typeof tareas>();
+    for (const t of tareas) {
+      const key = t.componente || 'General';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(t);
+    }
+    return groups;
+  }, [tareas]);
+
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const toggleGroup = (key: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
   const handleAdd = () => {
     if (!newComponente.trim() || !newDescripcion.trim()) return;
     const nextNumero = tareas.length > 0 ? Math.max(...tareas.map((t) => t.numero)) + 1 : 1;
@@ -454,67 +477,73 @@ function TareasSTPChecklist({ idOT, canEdit, esEstadoFinal }: { idOT: string; ca
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="divide-y">
-          {tareas.map((t) => (
-            <div
-              key={t.id}
-              className={`flex items-start gap-3 px-4 py-3 transition-colors ${t.completada ? 'bg-muted/40' : ''}`}
-            >
-              {/* Checkbox */}
-              <button
-                type="button"
-                disabled={!editable}
-                onClick={() =>
-                  updateTarea.mutate({
-                    idTarea: t.id,
-                    body: { completada: !t.completada },
-                  })
-                }
-                className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
-                  t.completada
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-input hover:border-primary'
-                } ${!editable ? 'opacity-50' : 'cursor-pointer'}`}
-              >
-                {t.completada && <Check className="h-3 w-3" />}
-              </button>
-
-              {/* Content */}
-              <div className="flex-1 min-w-0">
-                <div className={`flex items-center gap-2 ${t.completada ? 'line-through text-muted-foreground' : ''}`}>
-                  <InlineEdit
-                    value={t.componente}
-                    disabled={!editable}
-                    onSave={(v) => updateTarea.mutate({ idTarea: t.id, body: { componente: v } })}
-                    className="font-medium text-sm"
-                  />
-                  <span className="text-muted-foreground">—</span>
-                  <InlineEdit
-                    value={t.descripcion}
-                    disabled={!editable}
-                    onSave={(v) => updateTarea.mutate({ idTarea: t.id, body: { descripcion: v } })}
-                    className="text-sm"
-                  />
-                </div>
-                <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                  {t.requiereRepuesto && t.repuesto ? (
-                    <Badge variant={REPUESTO_VARIANT[t.repuesto.estado] ?? 'secondary'} className="text-[10px] px-1.5 py-0">
-                      {t.repuesto.estado}
-                    </Badge>
-                  ) : t.requiereRepuesto ? (
-                    <Badge variant="destructive" className="text-[10px] px-1.5 py-0">SIN REPUESTO</Badge>
-                  ) : null}
-                  <span>Creada {formatDateShort(t.creadoEn)}</span>
-                  {t.updatedAt !== t.creadoEn && (
-                    <span>· Mod. {formatDateShort(t.updatedAt)}</span>
-                  )}
-                </div>
+        <div>
+          {/* Grouped tasks by componente */}
+          {Array.from(groupedTareas.entries()).map(([componente, groupTareas]) => {
+            const groupCompleted = groupTareas.filter((t) => t.completada).length;
+            const isCollapsed = collapsedGroups.has(componente);
+            return (
+              <div key={componente}>
+                {/* Group header */}
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(componente)}
+                  className="flex w-full items-center justify-between px-4 py-2 bg-muted/60 border-b hover:bg-muted/80 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    <span className="text-sm font-semibold">{componente}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {groupCompleted}/{groupTareas.length} completadas
+                  </span>
+                </button>
+                {/* Tasks in group */}
+                {!isCollapsed && (
+                  <div className="divide-y">
+                    {groupTareas.map((t) => (
+                      <div
+                        key={t.id}
+                        className={`flex items-start gap-3 px-4 py-3 pl-10 transition-colors ${t.completada ? 'bg-muted/40' : ''}`}
+                      >
+                        <button
+                          type="button"
+                          disabled={!editable}
+                          onClick={() => updateTarea.mutate({ idTarea: t.id, body: { completada: !t.completada } })}
+                          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
+                            t.completada ? 'border-primary bg-primary text-primary-foreground' : 'border-input hover:border-primary'
+                          } ${!editable ? 'opacity-50' : 'cursor-pointer'}`}
+                        >
+                          {t.completada && <Check className="h-3 w-3" />}
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <div className={`${t.completada ? 'line-through text-muted-foreground' : ''}`}>
+                            <InlineEdit
+                              value={t.descripcion}
+                              disabled={!editable}
+                              onSave={(v) => updateTarea.mutate({ idTarea: t.id, body: { descripcion: v } })}
+                              className="text-sm"
+                            />
+                          </div>
+                          <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                            {t.requiereRepuesto && t.repuesto ? (
+                              <Badge variant={REPUESTO_VARIANT[t.repuesto.estado] ?? 'secondary'} className="text-[10px] px-1.5 py-0">
+                                {t.repuesto.estado}
+                              </Badge>
+                            ) : t.requiereRepuesto ? (
+                              <Badge variant="destructive" className="text-[10px] px-1.5 py-0">SIN REPUESTO</Badge>
+                            ) : null}
+                            <span>#{t.numero}</span>
+                            <span>· {formatDateShort(t.creadoEn)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-
-              {/* Task number */}
-              <span className="shrink-0 text-xs text-muted-foreground">#{t.numero}</span>
-            </div>
-          ))}
+            );
+          })}
 
           {tareas.length === 0 && !editable && (
             <p className="px-4 py-6 text-center text-sm text-muted-foreground">
@@ -524,15 +553,21 @@ function TareasSTPChecklist({ idOT, canEdit, esEstadoFinal }: { idOT: string; ca
 
           {/* Add row / Bulk import */}
           {editable && !bulkMode && (
-            <div className="flex items-center gap-2 px-4 py-3 bg-muted/20">
+            <div className="flex items-center gap-2 px-4 py-3 bg-muted/20 border-t">
               <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <Input
-                placeholder="Componente"
-                value={newComponente}
-                onChange={(e) => setNewComponente(e.target.value)}
-                className="h-8 text-sm flex-1"
-                onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-              />
+              <div className="flex-1 relative">
+                <input
+                  list="partes-vehiculo"
+                  placeholder="Parte del vehículo"
+                  value={newComponente}
+                  onChange={(e) => setNewComponente(e.target.value)}
+                  className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+                />
+                <datalist id="partes-vehiculo">
+                  {PARTES_VEHICULO.map((p) => <option key={p} value={p} />)}
+                </datalist>
+              </div>
               <Input
                 placeholder="Descripción de la tarea"
                 value={newDescripcion}
@@ -580,11 +615,11 @@ function TareasSTPChecklist({ idOT, canEdit, esEstadoFinal }: { idOT: string; ca
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Copia las columnas desde Excel y pega aqui. Formato: <span className="font-mono bg-muted px-1 rounded">Componente [Tab] Descripcion</span> por fila.
+                Copia las columnas desde Excel y pega aquí. Formato: <span className="font-mono bg-muted px-1 rounded">Parte [Tab] Descripción</span> por fila.
               </p>
               <textarea
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono min-h-[100px] resize-y focus:outline-none focus:ring-2 focus:ring-ring"
-                placeholder={"Motor hidraulico\tReemplazo sello principal\nSistema electrico\tRevision cableado cabina\nFiltros\tCambio filtro aire y aceite"}
+                placeholder={"Motor\tReemplazo sello principal\nSistema Hidráulico\tRevisión cañerías\nFiltros\tCambio filtro aire y aceite"}
                 value={bulkText}
                 onChange={(e) => handleBulkTextChange(e.target.value)}
               />
@@ -615,6 +650,143 @@ function TareasSTPChecklist({ idOT, canEdit, esEstadoFinal }: { idOT: string; ca
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// ─── Dialog para Tareas Adicionales ──────────────────────────────────────────
+
+function NuevaTareaAdicionalDialog({ idOT, estadoActual, canEdit, esEstadoFinal }: {
+  idOT: string; estadoActual: string; canEdit: boolean; esEstadoFinal: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState({
+    descripcion: '',
+    componente: '',
+    tipoTrabajo: '',
+    momentoRegistro: estadoActual,
+    costo: '',
+    insumos: '',
+  });
+
+  const crear = useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api.post(`/ordenes/${idOT}/tareas-adicionales`, body),
+    onSuccess: () => {
+      toast.success('Tarea adicional registrada');
+      setForm({ descripcion: '', componente: '', tipoTrabajo: '', momentoRegistro: estadoActual, costo: '', insumos: '' });
+      setOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['ot', idOT] });
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Error';
+      toast.error(msg);
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.descripcion.trim() || !form.costo) return;
+    crear.mutate({
+      descripcion: form.descripcion.trim(),
+      componente: form.componente.trim() || undefined,
+      tipoTrabajo: form.tipoTrabajo || undefined,
+      momentoRegistro: form.momentoRegistro,
+      costo: Number(form.costo),
+      insumos: form.insumos.trim() || undefined,
+    });
+  };
+
+  if (!canEdit || esEstadoFinal) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline">
+          <Plus className="mr-2 h-4 w-4" />
+          Tarea adicional
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Registrar Tarea Adicional</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Descripción *</Label>
+            <textarea
+              className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              placeholder="Descripción del trabajo adicional..."
+              value={form.descripcion}
+              onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Parte del vehículo</Label>
+              <div className="relative">
+                <input
+                  list="partes-vehiculo-ta"
+                  placeholder="Ej: Motor"
+                  value={form.componente}
+                  onChange={(e) => setForm({ ...form, componente: e.target.value })}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                />
+                <datalist id="partes-vehiculo-ta">
+                  {PARTES_VEHICULO.map((p) => <option key={p} value={p} />)}
+                </datalist>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Tipo de trabajo</Label>
+              <Select value={form.tipoTrabajo} onValueChange={(v) => setForm({ ...form, tipoTrabajo: v })}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                <SelectContent>
+                  {TIPOS_TRABAJO.map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Momento de registro *</Label>
+              <Select value={form.momentoRegistro} onValueChange={(v) => setForm({ ...form, momentoRegistro: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ESTADOS_OT.filter((e) => !['ENTREGADO', 'CANCELADO'].includes(e)).map((e) => (
+                    <SelectItem key={e} value={e}>{ESTADO_LABELS[e]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Costo (CLP) *</Label>
+              <Input
+                type="number"
+                min="0"
+                step="1"
+                placeholder="50000"
+                value={form.costo}
+                onChange={(e) => setForm({ ...form, costo: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Insumos utilizados</Label>
+            <Input
+              placeholder="Ej: Sello hidráulico, aceite 15W40..."
+              value={form.insumos}
+              onChange={(e) => setForm({ ...form, insumos: e.target.value })}
+            />
+          </div>
+          <Button type="submit" className="w-full" disabled={!form.descripcion.trim() || !form.costo || crear.isPending}>
+            {crear.isPending ? 'Guardando...' : 'Registrar Tarea'}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -718,48 +890,56 @@ export default function OtDetailPage() {
       </div>
 
       {/* Tareas adicionales */}
-      {ot.tareasAdicionales?.length > 0 && (
-        <Card>
-          <CardHeader><CardTitle>Tareas Adicionales</CardTitle></CardHeader>
-          <CardContent className="p-0">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>
+              Tareas Adicionales
+              {ot.tareasAdicionales?.length > 0 && (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  ({ot.tareasAdicionales.length}) · Total: ${ot.tareasAdicionales.reduce((sum: number, t: { costo: string }) => sum + Number(t.costo), 0).toLocaleString('es-CL')}
+                </span>
+              )}
+            </CardTitle>
+            <NuevaTareaAdicionalDialog idOT={id} estadoActual={ot.estado} canEdit={!!canEdit} esEstadoFinal={esEstadoFinal} />
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {ot.tareasAdicionales?.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Descripción</TableHead>
-                  <TableHead>Componente</TableHead>
+                  <TableHead>Parte</TableHead>
+                  <TableHead>Tipo</TableHead>
                   <TableHead>Costo</TableHead>
                   <TableHead>Registrado por</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {ot.tareasAdicionales.map((t: { id: string; descripcion: string; componente?: string; costo: string; usuario?: { nombre: string } }) => (
+                {ot.tareasAdicionales.map((t: { id: string; descripcion: string; componente?: string; tipoTrabajo?: string; costo: string; usuario?: { nombre: string } }) => (
                   <TableRow key={t.id}>
                     <TableCell>{t.descripcion}</TableCell>
-                    <TableCell>{t.componente ?? '—'}</TableCell>
+                    <TableCell className="text-muted-foreground">{t.componente ?? '—'}</TableCell>
+                    <TableCell className="text-muted-foreground">{t.tipoTrabajo ?? '—'}</TableCell>
                     <TableCell>${Number(t.costo).toLocaleString('es-CL')}</TableCell>
-                    <TableCell>{t.usuario?.nombre ?? '—'}</TableCell>
+                    <TableCell className="text-muted-foreground">{t.usuario?.nombre ?? '—'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            <p className="px-6 py-4 text-sm text-muted-foreground text-center">
+              Sin tareas adicionales registradas
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Log de auditoría */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Log de Auditoría</CardTitle>
-            {canEdit && !esEstadoFinal && (
-              <Link href={`/ots/${id}/tarea`}>
-                <Button size="sm" variant="outline">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Tarea adicional
-                </Button>
-              </Link>
-            )}
-          </div>
+          <CardTitle>Log de Auditoría</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y">

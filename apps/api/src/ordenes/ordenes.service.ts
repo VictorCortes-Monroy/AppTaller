@@ -119,11 +119,6 @@ export class OrdenesService {
   async findAll(idTaller: string, usuario: JwtPayload) {
     const where: Prisma.OrdenTrabajoWhereInput = { idTaller };
 
-    // TECNICO solo ve sus OTs asignadas
-    if (usuario.rol === RolUsuario.TECNICO) {
-      where.idTecnico = usuario.sub;
-    }
-
     return this.prisma.ordenTrabajo.findMany({
       where,
       select: OT_SELECT,
@@ -135,7 +130,6 @@ export class OrdenesService {
 
   async findOne(id: string, idTaller: string, usuario: JwtPayload) {
     const where: Prisma.OrdenTrabajoWhereInput = { id, idTaller };
-    if (usuario.rol === RolUsuario.TECNICO) where.idTecnico = usuario.sub;
 
     const ot = await this.prisma.ordenTrabajo.findFirst({
       where,

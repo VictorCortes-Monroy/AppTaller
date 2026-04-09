@@ -15,14 +15,14 @@ export class DashboardController {
   constructor(private service: DashboardService) {}
 
   @Get('resumen')
-  @Roles(RolUsuario.JEFE, RolUsuario.SUPERVISOR, RolUsuario.ADMIN)
+  @Roles(RolUsuario.JEFE, RolUsuario.SUPERVISOR, RolUsuario.TECNICO, RolUsuario.BODEGA, RolUsuario.ADMIN)
   @ApiOperation({ summary: 'Resumen general: KPIs, distribución por estado/tipo, actividad reciente' })
   getResumen(@CurrentTaller() idTaller: string) {
     return this.service.getResumen(idTaller);
   }
 
   @Get('ots-activas')
-  @Roles(RolUsuario.JEFE, RolUsuario.SUPERVISOR, RolUsuario.ADMIN)
+  @Roles(RolUsuario.JEFE, RolUsuario.SUPERVISOR, RolUsuario.TECNICO, RolUsuario.BODEGA, RolUsuario.ADMIN)
   @ApiOperation({
     summary: 'Vista 1: OTs activas con alertas de demora (>7 días), repuestos pendientes y tareas adicionales',
   })
@@ -40,7 +40,7 @@ export class DashboardController {
   }
 
   @Get('historial')
-  @Roles(RolUsuario.JEFE, RolUsuario.SUPERVISOR, RolUsuario.ADMIN)
+  @Roles(RolUsuario.JEFE, RolUsuario.SUPERVISOR, RolUsuario.TECNICO, RolUsuario.BODEGA, RolUsuario.ADMIN)
   @ApiOperation({
     summary: 'Vista 3: Todos los eventos del taller en orden cronológico descendente (log inmutable)',
   })

@@ -23,14 +23,14 @@ const NAV_ITEMS = [
     href: '/',
     label: 'Inicio',
     icon: LayoutDashboard,
-    roles: ['JEFE', 'SUPERVISOR', 'ADMIN'],
+    roles: ['JEFE', 'SUPERVISOR', 'TECNICO', 'BODEGA', 'ADMIN'],
     exact: true,
   },
   {
     href: '/ots',
     label: 'Gestión de Actividades',
     icon: ClipboardList,
-    roles: ['JEFE', 'SUPERVISOR', 'TECNICO', 'ADMIN'],
+    roles: ['JEFE', 'SUPERVISOR', 'TECNICO', 'BODEGA', 'ADMIN'],
   },
   {
     href: '/repuestos',
@@ -42,7 +42,7 @@ const NAV_ITEMS = [
     href: '/historial',
     label: 'Historial',
     icon: History,
-    roles: ['JEFE', 'SUPERVISOR', 'ADMIN'],
+    roles: ['JEFE', 'SUPERVISOR', 'TECNICO', 'BODEGA', 'ADMIN'],
   },
   {
     href: '/vehiculos',

@@ -72,7 +72,7 @@ export class OrdenesController {
   }
 
   @Get(':id/log')
-  @Roles(RolUsuario.JEFE, RolUsuario.SUPERVISOR, RolUsuario.BODEGA, RolUsuario.ADMIN)
+  @Roles(RolUsuario.JEFE, RolUsuario.SUPERVISOR, RolUsuario.TECNICO, RolUsuario.BODEGA, RolUsuario.ADMIN)
   @ApiOperation({ summary: 'Log de auditoría de una OT (insert-only, orden cronológico desc)' })
   getLog(
     @Param('id') id: string,
