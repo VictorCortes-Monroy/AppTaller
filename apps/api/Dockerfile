@@ -36,7 +36,4 @@ WORKDIR /app/apps/api
 
 EXPOSE 3001
 
-## ⚠️ TEMPORAL: este CMD ejecuta un reset+seed en cada arranque
-## Después de validar que Railway arrancó bien con datos demo, REVERTIR a:
-##   CMD ["sh", "-c", "npx prisma db push --skip-generate && node dist/src/main"]
-CMD ["sh", "-c", "npx prisma db push --force-reset --skip-generate --accept-data-loss && npx prisma db seed && node dist/src/main"]
+CMD ["sh", "-c", "npx prisma db push --skip-generate && node dist/src/main"]
