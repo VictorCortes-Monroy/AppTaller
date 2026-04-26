@@ -46,10 +46,12 @@ interface OTItem {
   id: string;
   numeroOT: string;
   estado: string;
+  frente: string | null;
   diasEnTaller: number;
   alerta: boolean;
   vehiculo: { numeroSerie: string; modelo: string; marca: string; cliente: string };
   tecnico: { nombre: string } | null;
+  ordenServicio: { id: string; numeroOS: string; estado: string } | null;
   repuestosPendientes: number;
   tareasAdicionalesCount: number;
 }
@@ -355,6 +357,13 @@ function OTKanbanCard({ ot }: { ot: OTItem }) {
           {ot.alerta && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
         </div>
 
+        {ot.ordenServicio && (
+          <p className="text-[10px] text-muted-foreground">
+            {ot.ordenServicio.numeroOS}
+            {ot.frente ? ` · ${ot.frente}` : ''}
+          </p>
+        )}
+
         {/* Vehicle */}
         <div>
           <p className="text-sm font-medium truncate">{ot.vehiculo.marca} {ot.vehiculo.modelo}</p>
@@ -434,10 +443,12 @@ export default function OtsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Gestión de Actividades</h1>
-          <p className="text-muted-foreground">{ots.length} OTs activas en el taller</p>
+          <h1 className="text-2xl font-bold">Trabajos (OT)</h1>
+          <p className="text-muted-foreground">
+            {ots.length} OTs activas en el taller. Las OTs se crean dentro de una{' '}
+            <Link href="/ordenes-servicio" className="underline">Orden de Servicio</Link>.
+          </p>
         </div>
-        {canCreate && <NuevaOTDialog otsActivas={ots} />}
       </div>
 
       {/* Barra de filtros */}

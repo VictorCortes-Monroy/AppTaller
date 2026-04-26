@@ -11,6 +11,7 @@ import {
   Clock,
   ArrowRight,
   Activity,
+  FolderKanban,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -79,6 +80,9 @@ const REPUESTO_COLORS: Record<string, string> = {
 
 interface Resumen {
   kpis: {
+    osActivas?: number;
+    osTotal?: number;
+    osConAlerta?: number;
     otsActivas: number;
     otsCompletadas: number;
     otsCanceladas: number;
@@ -212,11 +216,17 @@ export default function DashboardPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <KpiCard
+          title="OS Activas"
+          value={kpis.osActivas ?? 0}
+          subtitle={`de ${kpis.osTotal ?? 0} total`}
+          icon={FolderKanban}
+        />
         <KpiCard
           title="OTs Activas"
           value={kpis.otsActivas}
-          subtitle={`${kpis.promedioDiasActivas}d promedio en taller`}
+          subtitle={`${kpis.promedioDiasActivas}d promedio`}
           icon={ClipboardList}
         />
         <KpiCard

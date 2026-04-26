@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { VehiculosModule } from './vehiculos/vehiculos.module';
 import { OrdenesModule } from './ordenes/ordenes.module';
+import { OrdenesServicioModule } from './ordenes-servicio/ordenes-servicio.module';
 import { S3Module } from './common/s3/s3.module';
 import { InformeTecnicoModule } from './informe-tecnico/informe-tecnico.module';
 import { RepuestosModule } from './repuestos/repuestos.module';
@@ -28,6 +29,7 @@ import { ClientesModule } from './clientes/clientes.module';
     ClientesModule,
     // ─── Fase 2 ───────────────────────────────
     VehiculosModule,
+    OrdenesServicioModule,
     OrdenesModule,
     // ─── Fase 3 ───────────────────────────────
     InformeTecnicoModule,

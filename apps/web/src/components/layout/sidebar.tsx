@@ -13,6 +13,7 @@ import {
   Users,
   LogOut,
   Wrench,
+  FolderKanban,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { clearTokens, getUser, TokenPayload } from '@/lib/auth';
@@ -27,8 +28,14 @@ const NAV_ITEMS = [
     exact: true,
   },
   {
+    href: '/ordenes-servicio',
+    label: 'Órdenes de Servicio',
+    icon: FolderKanban,
+    roles: ['JEFE', 'SUPERVISOR', 'TECNICO', 'BODEGA', 'ADMIN'],
+  },
+  {
     href: '/ots',
-    label: 'Gestión de Actividades',
+    label: 'Trabajos (OT)',
     icon: ClipboardList,
     roles: ['JEFE', 'SUPERVISOR', 'TECNICO', 'BODEGA', 'ADMIN'],
   },

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RolUsuario } from '@prisma/client';
 import { OrdenesService } from './ordenes.service';
@@ -20,7 +20,7 @@ export class OrdenesController {
 
   @Post()
   @Roles(RolUsuario.JEFE, RolUsuario.SUPERVISOR)
-  @ApiOperation({ summary: 'Crear OT (valida 1 activa por vehículo)' })
+  @ApiOperation({ summary: 'Crear OT dentro de una OS (frente de trabajo paralelo)' })
   create(
     @CurrentTaller() idTaller: string,
     @CurrentUser() usuario: JwtPayload,
@@ -30,12 +30,13 @@ export class OrdenesController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar OTs del taller (TECNICO solo ve las suyas)' })
+  @ApiOperation({ summary: 'Listar OTs del taller (filtrable por idOrdenServicio)' })
   findAll(
     @CurrentTaller() idTaller: string,
     @CurrentUser() usuario: JwtPayload,
+    @Query('idOrdenServicio') idOrdenServicio?: string,
   ) {
-    return this.ordenesService.findAll(idTaller, usuario);
+    return this.ordenesService.findAll(idTaller, usuario, { idOrdenServicio });
   }
 
   @Get(':id')

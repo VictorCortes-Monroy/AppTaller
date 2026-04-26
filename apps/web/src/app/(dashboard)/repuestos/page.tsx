@@ -31,7 +31,14 @@ interface Repuesto {
 }
 
 interface GrupoOT {
-  ot: { id: string; numeroOT: string; estado: string; vehiculo: { numeroSerie: string; modelo: string; marca: string; cliente: string } };
+  ot: {
+    id: string;
+    numeroOT: string;
+    estado: string;
+    frente: string | null;
+    vehiculo: { numeroSerie: string; modelo: string; marca: string; cliente: string };
+    ordenServicio: { id: string; numeroOS: string } | null;
+  };
   repuestos: Repuesto[];
 }
 
@@ -83,7 +90,17 @@ export default function RepuestosPage() {
           <Card key={grupo.ot.id}>
             <CardHeader>
               <CardTitle className="text-base">
-                {grupo.ot.numeroOT} — {grupo.ot.vehiculo.numeroSerie}{' '}
+                {grupo.ot.ordenServicio && (
+                  <span className="text-muted-foreground font-normal text-sm">
+                    {grupo.ot.ordenServicio.numeroOS} ·{' '}
+                  </span>
+                )}
+                {grupo.ot.numeroOT}
+                {grupo.ot.frente && (
+                  <span className="font-normal text-muted-foreground"> · {grupo.ot.frente}</span>
+                )}
+                {' — '}
+                {grupo.ot.vehiculo.numeroSerie}{' '}
                 <span className="font-normal text-muted-foreground">
                   ({grupo.ot.vehiculo.modelo})
                 </span>

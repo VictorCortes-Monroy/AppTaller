@@ -32,6 +32,14 @@ enum EstadoOT {
   EN_ESPERA          // Pausado temporalmente
 }
 
+enum EstadoOS {
+  ABIERTA            // OS recién creada, sin OTs o todas en INGRESADO
+  EN_SERVICIO        // al menos 1 OT en estado activo
+  LISTA_PARA_ENTREGA // todas las OTs finalizadas, esperando retiro del vehículo
+  ENTREGADA          // entrega registrada y vehículo retirado
+  CANCELADA          // OS cancelada con cascada a las OTs activas
+}
+
 enum EstadoRepuesto {
   PENDIENTE    // Registrado, aún no solicitado
   EN_ESPERA    // Solicitado, esperando confirmación
@@ -62,6 +70,14 @@ enum TipoEventoLog {
   ACTUALIZACION_REPUESTO
 }
 
+enum TipoEventoLogOS {
+  CREACION_OS
+  CAMBIO_ESTADO_OS
+  CREACION_OT_HIJA       // se creó una OT bajo esta OS
+  ENTREGA_OS
+  CANCELACION_OS
+}
+
 // ─── Tablas ──────────────────────────────────────────────────────────────────
 
 model Taller {
@@ -75,6 +91,7 @@ model Taller {
 
   usuarios        Usuario[]
   vehiculos       Vehiculo[]
+  ordenesServicio OrdenServicio[]
   ordenesTrabajo  OrdenTrabajo[]
   clientes        Cliente[]
 
@@ -117,6 +134,7 @@ model Usuario {
   ordenesAsignadas    OrdenTrabajo[]  @relation("TecnicoAsignado")
   tareasAdicionales   TareaAdicional[]
   logsGenerados       LogEstadoOT[]
+  logsOSGenerados     LogEstadoOS[]
 
   @@unique([email, idTaller])
   @@index([idTaller, rol])
@@ -136,9 +154,10 @@ model Vehiculo {
   creadoEn    DateTime @default(now()) @map("creado_en")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  taller         Taller         @relation(fields: [idTaller], references: [id])
-  clienteRef     Cliente?       @relation(fields: [idCliente], references: [id])
-  ordenesTrabajo OrdenTrabajo[]
+  taller          Taller          @relation(fields: [idTaller], references: [id])
+  clienteRef      Cliente?        @relation(fields: [idCliente], references: [id])
+  ordenesServicio OrdenServicio[]
+  ordenesTrabajo  OrdenTrabajo[]
 
   @@unique([idTaller, numeroSerie]) // VIN único por taller
   @@index([idTaller, numeroSerie])
@@ -148,31 +167,34 @@ model Vehiculo {
 model OrdenTrabajo {
   id               String    @id @default(cuid())
   idTaller         String    @map("id_taller")
+  idOrdenServicio  String    @map("id_orden_servicio")
   idVehiculo       String    @map("id_vehiculo")
   idTecnico        String?   @map("id_tecnico")
   numeroOT         String    @map("numero_ot")   // formato: OT-YYYY-NNN
   estado           EstadoOT     @default(INGRESADO)
+  frente           String?   // "Motor", "Hidráulico", "Eléctrico", "Transmisión", etc.
   tipoServicio     TipoServicio? @map("tipo_servicio")
-  descripcion      String?   // motivo de ingreso inicial
-  kilometraje      Int?      // odómetro al ingreso
-  kilometrajeSalida Int?     @map("kilometraje_salida")
+  descripcion      String?   // descripción del frente específico
+  kilometraje      Int?      // odómetro al ingreso (legacy, ya está en OS)
+  kilometrajeSalida Int?     @map("kilometraje_salida") // legacy, ya está en OS
   fechaEntrega     DateTime? @map("fecha_entrega")
   receptorNombre   String?   @map("receptor_nombre")
   comentarioCancelacion String? @map("comentario_cancelacion")
   creadoEn         DateTime  @default(now()) @map("creado_en")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
-  taller           Taller          @relation(fields: [idTaller], references: [id])
-  vehiculo         Vehiculo        @relation(fields: [idVehiculo], references: [id])
-  tecnico          Usuario?        @relation("TecnicoAsignado", fields: [idTecnico], references: [id])
-  informeTecnico   InformeTecnico?
-  repuestos        Repuesto[]
+  taller            Taller          @relation(fields: [idTaller], references: [id])
+  ordenServicio     OrdenServicio   @relation(fields: [idOrdenServicio], references: [id])
+  vehiculo          Vehiculo        @relation(fields: [idVehiculo], references: [id])
+  tecnico           Usuario?        @relation("TecnicoAsignado", fields: [idTecnico], references: [id])
+  informeTecnico    InformeTecnico?
+  repuestos         Repuesto[]
   tareasAdicionales TareaAdicional[]
-  logs             LogEstadoOT[]
+  logs              LogEstadoOT[]
 
   @@unique([idTaller, numeroOT])
-  @@index([idTaller, estado])       // OTs activas por taller
-  @@index([idVehiculo, estado])     // validar 1 OT activa por vehículo
+  @@index([idTaller, estado])         // OTs activas por taller
+  @@index([idOrdenServicio, estado])  // OTs por OS y estado
   @@map("orden_trabajo")
 }
 
@@ -271,4 +293,49 @@ model LogEstadoOT {
 
   @@index([idOT, fechaEvento(sort: Desc)]) // historial de OT
   @@map("log_estado_ot")
+}
+
+model OrdenServicio {
+  id                    String     @id @default(cuid())
+  idTaller              String     @map("id_taller")
+  idVehiculo            String     @map("id_vehiculo")
+  numeroOS              String     @map("numero_os")   // formato: OS-YYYY-NNN
+  estado                EstadoOS   @default(ABIERTA)
+  kilometrajeIngreso    Int?       @map("kilometraje_ingreso")
+  kilometrajeSalida     Int?       @map("kilometraje_salida")
+  motivoIngreso         String?    @map("motivo_ingreso")  // anotación libre del supervisor al recibir
+  fechaIngreso          DateTime   @default(now()) @map("fecha_ingreso")
+  fechaEntrega          DateTime?  @map("fecha_entrega")
+  receptorNombre        String?    @map("receptor_nombre")
+  comentarioCancelacion String?    @map("comentario_cancelacion")
+  creadoEn              DateTime   @default(now()) @map("creado_en")
+  updatedAt             DateTime   @updatedAt @map("updated_at")
+
+  taller          Taller          @relation(fields: [idTaller], references: [id])
+  vehiculo        Vehiculo        @relation(fields: [idVehiculo], references: [id])
+  ordenesTrabajo  OrdenTrabajo[]
+  logs            LogEstadoOS[]
+
+  @@unique([idTaller, numeroOS])
+  @@index([idTaller, estado])      // OS activas por taller
+  @@index([idVehiculo, estado])    // validar 1 OS activa por vehículo
+  @@map("orden_servicio")
+}
+
+model LogEstadoOS {
+  id              String           @id @default(cuid())
+  idOrdenServicio String           @map("id_orden_servicio")
+  idUsuario       String           @map("id_usuario")
+  tipoEvento      TipoEventoLogOS  @map("tipo_evento")
+  estadoAnterior  EstadoOS?        @map("estado_anterior")
+  estadoNuevo     EstadoOS?        @map("estado_nuevo")
+  descripcion     String
+  comentario      String?
+  fechaEvento     DateTime         @default(now()) @map("fecha_evento")
+
+  ordenServicio OrdenServicio @relation(fields: [idOrdenServicio], references: [id])
+  usuario       Usuario       @relation(fields: [idUsuario], references: [id])
+
+  @@index([idOrdenServicio, fechaEvento(sort: Desc)])
+  @@map("log_estado_os")
 }

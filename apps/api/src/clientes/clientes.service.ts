@@ -30,16 +30,23 @@ export class ClientesService {
       orderBy: { nombre: 'asc' },
     });
 
-    // Obtener stats de OTs por cliente en una sola query
+    // Obtener stats consolidadas: OS y OT por cliente, último servicio
     const stats = await this.prisma.$queryRaw<
-      { clienteId: string; totalOts: number; ultimoServicio: Date | null }[]
+      {
+        clienteId: string;
+        totalOts: number;
+        totalOs: number;
+        ultimoServicio: Date | null;
+      }[]
     >`
       SELECT c.id as "clienteId",
-             COUNT(ot.id)::int as "totalOts",
-             MAX(ot.creado_en) as "ultimoServicio"
+             COUNT(DISTINCT ot.id)::int as "totalOts",
+             COUNT(DISTINCT os.id)::int as "totalOs",
+             GREATEST(MAX(ot.creado_en), MAX(os.creado_en)) as "ultimoServicio"
       FROM cliente c
       LEFT JOIN vehiculo v ON v.id_cliente = c.id
       LEFT JOIN orden_trabajo ot ON ot.id_vehiculo = v.id
+      LEFT JOIN orden_servicio os ON os.id_vehiculo = v.id
       WHERE c.id_taller = ${idTaller} AND c.activo = true
       GROUP BY c.id
     `;
@@ -52,6 +59,7 @@ export class ClientesService {
         ...c,
         vehiculosCount: c._count.vehiculos,
         totalServicios: s?.totalOts ?? 0,
+        totalOrdenesServicio: s?.totalOs ?? 0,
         ultimoServicio: s?.ultimoServicio ?? null,
       };
     });
@@ -65,7 +73,7 @@ export class ClientesService {
           select: {
             id: true, marca: true, modelo: true, numeroSerie: true,
             sucursal: true, activo: true, creadoEn: true,
-            _count: { select: { ordenesTrabajo: true } },
+            _count: { select: { ordenesTrabajo: true, ordenesServicio: true } },
           },
           orderBy: { creadoEn: 'desc' },
         },
@@ -74,7 +82,27 @@ export class ClientesService {
 
     if (!cliente) throw new NotFoundException('Cliente no encontrado');
 
-    // OTs de todos los vehículos del cliente
+    // OS del cliente con OTs anidadas
+    const ordenesServicio = await this.prisma.ordenServicio.findMany({
+      where: { idTaller, vehiculo: { idCliente: id } },
+      select: {
+        id: true, numeroOS: true, estado: true,
+        fechaIngreso: true, fechaEntrega: true,
+        motivoIngreso: true, kilometrajeIngreso: true,
+        vehiculo: { select: { marca: true, modelo: true, numeroSerie: true } },
+        ordenesTrabajo: {
+          select: {
+            id: true, numeroOT: true, estado: true, frente: true,
+            tipoServicio: true,
+            tecnico: { select: { nombre: true } },
+          },
+        },
+      },
+      orderBy: { creadoEn: 'desc' },
+      take: 50,
+    });
+
+    // OTs (legacy, mantenido para compatibilidad con UI actual)
     const ordenes = await this.prisma.ordenTrabajo.findMany({
       where: {
         idTaller,
@@ -82,28 +110,46 @@ export class ClientesService {
       },
       select: {
         id: true, numeroOT: true, estado: true, tipoServicio: true,
+        frente: true,
         descripcion: true, creadoEn: true, fechaEntrega: true,
         vehiculo: { select: { marca: true, modelo: true, numeroSerie: true } },
         tecnico: { select: { nombre: true } },
+        ordenServicio: { select: { id: true, numeroOS: true } },
       },
       orderBy: { creadoEn: 'desc' },
       take: 50,
     });
 
     // Resumen
-    const stats = await this.prisma.ordenTrabajo.aggregate({
-      where: { idTaller, vehiculo: { idCliente: id } },
-      _count: { id: true },
-      _max: { creadoEn: true },
-    });
+    const [statsOT, statsOS] = await Promise.all([
+      this.prisma.ordenTrabajo.aggregate({
+        where: { idTaller, vehiculo: { idCliente: id } },
+        _count: { id: true },
+        _max: { creadoEn: true },
+      }),
+      this.prisma.ordenServicio.aggregate({
+        where: { idTaller, vehiculo: { idCliente: id } },
+        _count: { id: true },
+        _max: { creadoEn: true },
+      }),
+    ]);
+
+    const ultimoServicio =
+      statsOT._max.creadoEn && statsOS._max.creadoEn
+        ? statsOT._max.creadoEn > statsOS._max.creadoEn
+          ? statsOT._max.creadoEn
+          : statsOS._max.creadoEn
+        : statsOT._max.creadoEn ?? statsOS._max.creadoEn;
 
     return {
       ...cliente,
       ordenes,
+      ordenesServicio,
       resumen: {
         totalVehiculos: cliente.vehiculos.length,
-        totalServicios: stats._count.id,
-        ultimoServicio: stats._max.creadoEn,
+        totalServicios: statsOT._count.id,
+        totalOrdenesServicio: statsOS._count.id,
+        ultimoServicio,
       },
     };
   }

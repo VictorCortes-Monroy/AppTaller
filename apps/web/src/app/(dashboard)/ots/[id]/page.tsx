@@ -836,8 +836,19 @@ export default function OtDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">{ot.numeroOT}</h1>
+      <div className="space-y-2">
+        {ot.ordenServicio && (
+          <Link
+            href={`/ordenes-servicio/${ot.ordenServicio.id}`}
+            className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+          >
+            ← {ot.ordenServicio.numeroOS} / {ot.numeroOT}
+          </Link>
+        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          <h1 className="text-2xl font-bold">{ot.numeroOT}</h1>
+          {ot.frente && <Badge variant="secondary">{ot.frente}</Badge>}
+        </div>
         <p className="text-muted-foreground">
           {ot.vehiculo?.numeroSerie} — {ot.vehiculo?.marca} {ot.vehiculo?.modelo}
         </p>

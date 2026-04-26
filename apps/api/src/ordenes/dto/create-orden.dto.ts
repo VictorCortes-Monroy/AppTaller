@@ -3,9 +3,16 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TipoServicio } from '@prisma/client';
 
 export class CreateOrdenDto {
-  @ApiProperty({ description: 'ID del vehículo' })
+  @ApiProperty({ description: 'ID de la Orden de Servicio padre (contenedor)' })
   @IsString()
-  idVehiculo: string;
+  idOrdenServicio: string;
+
+  @ApiPropertyOptional({
+    description: 'Frente de trabajo (ej: Motor, Hidráulico, Eléctrico, Transmisión)',
+  })
+  @IsOptional()
+  @IsString()
+  frente?: string;
 
   @ApiPropertyOptional({ description: 'ID del técnico asignado' })
   @IsOptional()
@@ -17,12 +24,12 @@ export class CreateOrdenDto {
   @IsEnum(TipoServicio)
   tipoServicio?: TipoServicio;
 
-  @ApiPropertyOptional({ description: 'Motivo de ingreso / descripción inicial' })
+  @ApiPropertyOptional({ description: 'Descripción del frente / trabajo específico' })
   @IsOptional()
   @IsString()
   descripcion?: string;
 
-  @ApiPropertyOptional({ description: 'Kilometraje / horas al ingreso' })
+  @ApiPropertyOptional({ description: 'Kilometraje / horas al ingreso (legacy, se hereda de la OS)' })
   @IsOptional()
   @IsInt()
   kilometraje?: number;

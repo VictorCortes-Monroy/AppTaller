@@ -6,27 +6,35 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { EstadoOT, Prisma, RolUsuario, TipoEventoLog } from '@prisma/client';
+import {
+  EstadoOS,
+  EstadoOT,
+  Prisma,
+  RolUsuario,
+  TipoEventoLog,
+  TipoEventoLogOS,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtPayload } from '../auth/decorators/current-user.decorator';
 import { CreateOrdenDto } from './dto/create-orden.dto';
 import { CambiarEstadoDto } from './dto/cambiar-estado.dto';
 import { RegistrarEntregaDto } from './dto/registrar-entrega.dto';
 import {
-  ESTADOS_ACTIVOS,
   ESTADOS_FINALES,
   esTransicionValida,
-  TRANSICIONES_VALIDAS,
 } from './state-machine/ot-transitions';
+import { OrdenesServicioService } from '../ordenes-servicio/ordenes-servicio.service';
 
 // Selección estándar para respuestas de OT
 const OT_SELECT = {
   id: true,
   idTaller: true,
+  idOrdenServicio: true,
   idVehiculo: true,
   idTecnico: true,
   numeroOT: true,
   estado: true,
+  frente: true,
   tipoServicio: true,
   descripcion: true,
   kilometraje: true,
@@ -38,32 +46,31 @@ const OT_SELECT = {
   updatedAt: true,
   vehiculo: { select: { id: true, marca: true, modelo: true, numeroSerie: true, cliente: true } },
   tecnico: { select: { id: true, nombre: true } },
+  ordenServicio: { select: { id: true, numeroOS: true, estado: true } },
 } satisfies Prisma.OrdenTrabajoSelect;
 
 @Injectable()
 export class OrdenesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private ordenesServicioService: OrdenesServicioService,
+  ) {}
 
   // ─── Crear OT ─────────────────────────────────────────────────────────────
 
   async create(idTaller: string, usuario: JwtPayload, dto: CreateOrdenDto) {
-    // 1. Validar que el vehículo pertenece al taller
-    const vehiculo = await this.prisma.vehiculo.findFirst({
-      where: { id: dto.idVehiculo, idTaller, activo: true },
+    // 1. Validar OS existe, pertenece al taller, está activa (no entregada/cancelada)
+    const os = await this.prisma.ordenServicio.findFirst({
+      where: { id: dto.idOrdenServicio, idTaller },
     });
-    if (!vehiculo) throw new NotFoundException('Vehículo no encontrado');
-
-    // 2. Validar que no hay OT activa para el vehículo
-    const otActiva = await this.prisma.ordenTrabajo.findFirst({
-      where: { idVehiculo: dto.idVehiculo, estado: { in: ESTADOS_ACTIVOS } },
-    });
-    if (otActiva) {
+    if (!os) throw new NotFoundException('Orden de servicio no encontrada');
+    if (os.estado === EstadoOS.ENTREGADA || os.estado === EstadoOS.CANCELADA) {
       throw new ConflictException(
-        `El vehículo ya tiene una OT activa: ${otActiva.numeroOT}`,
+        `No se pueden agregar OTs a una OS en estado ${os.estado}`,
       );
     }
 
-    // 3. Validar técnico si se especificó
+    // 2. Validar técnico si se especificó
     if (dto.idTecnico) {
       const tecnico = await this.prisma.usuario.findFirst({
         where: { id: dto.idTecnico, idTaller, rol: RolUsuario.TECNICO, activo: true },
@@ -71,11 +78,9 @@ export class OrdenesService {
       if (!tecnico) throw new NotFoundException('Técnico no encontrado en este taller');
     }
 
-    // 4. Generar número OT en transacción serializable
+    // 3. Crear OT en transacción serializable
     return this.prisma.$transaction(async (tx) => {
       const year = new Date().getFullYear();
-
-      // Contar OTs del taller en el año actual
       const [result] = await tx.$queryRaw<[{ count: bigint }]>`
         SELECT COUNT(*) as count
         FROM orden_trabajo
@@ -88,27 +93,46 @@ export class OrdenesService {
       const ot = await tx.ordenTrabajo.create({
         data: {
           idTaller,
-          idVehiculo: dto.idVehiculo,
+          idOrdenServicio: dto.idOrdenServicio,
+          idVehiculo: os.idVehiculo,
           idTecnico: dto.idTecnico,
           numeroOT,
           estado: EstadoOT.INGRESADO,
+          frente: dto.frente,
           tipoServicio: dto.tipoServicio,
           descripcion: dto.descripcion,
-          kilometraje: dto.kilometraje,
+          kilometraje: dto.kilometraje ?? os.kilometrajeIngreso,
         },
         select: OT_SELECT,
       });
 
-      // 5. Log de creación (inmutable desde el inicio)
+      // Log creación de OT
       await tx.logEstadoOT.create({
         data: {
           idOT: ot.id,
           idUsuario: usuario.sub,
           tipoEvento: TipoEventoLog.CREACION_OT,
           estadoNuevo: EstadoOT.INGRESADO,
-          descripcion: `OT creada por ${usuario.email}`,
+          descripcion: `OT creada por ${usuario.email} (frente: ${dto.frente ?? 'sin especificar'})`,
         },
       });
+
+      // Log creación OT hija en la OS
+      await tx.logEstadoOS.create({
+        data: {
+          idOrdenServicio: dto.idOrdenServicio,
+          idUsuario: usuario.sub,
+          tipoEvento: TipoEventoLogOS.CREACION_OT_HIJA,
+          descripcion: `Nueva OT ${numeroOT} agregada a la OS (frente: ${dto.frente ?? 'sin especificar'})`,
+        },
+      });
+
+      // Recalcular estado de la OS (puede pasar de ABIERTA → ABIERTA si arranca en INGRESADO)
+      await this.ordenesServicioService.recalcularEstadoOS(
+        dto.idOrdenServicio,
+        usuario,
+        tx,
+      );
 
       return ot;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
@@ -116,8 +140,13 @@ export class OrdenesService {
 
   // ─── Listar OTs ───────────────────────────────────────────────────────────
 
-  async findAll(idTaller: string, usuario: JwtPayload) {
+  async findAll(
+    idTaller: string,
+    usuario: JwtPayload,
+    filtros?: { idOrdenServicio?: string },
+  ) {
     const where: Prisma.OrdenTrabajoWhereInput = { idTaller };
+    if (filtros?.idOrdenServicio) where.idOrdenServicio = filtros.idOrdenServicio;
 
     return this.prisma.ordenTrabajo.findMany({
       where,
@@ -210,18 +239,31 @@ export class OrdenesService {
           tipoEvento: TipoEventoLog.CAMBIO_ESTADO,
           estadoAnterior,
           estadoNuevo: dto.nuevoEstado,
-          descripcion: dto.descripcion ?? `Estado cambiado de ${estadoAnterior} a ${dto.nuevoEstado}`,
+          descripcion:
+            dto.descripcion ?? `Estado cambiado de ${estadoAnterior} a ${dto.nuevoEstado}`,
           comentario: dto.comentario,
         },
       });
+
+      // Recalcular estado de la OS
+      await this.ordenesServicioService.recalcularEstadoOS(
+        ot.idOrdenServicio,
+        usuario,
+        tx,
+      );
 
       return otActualizada;
     });
   }
 
-  // ─── Registrar entrega ────────────────────────────────────────────────────
+  // ─── Registrar entrega (a nivel OT individual) ────────────────────────────
 
-  async registrarEntrega(id: string, idTaller: string, usuario: JwtPayload, dto: RegistrarEntregaDto) {
+  async registrarEntrega(
+    id: string,
+    idTaller: string,
+    usuario: JwtPayload,
+    dto: RegistrarEntregaDto,
+  ) {
     const ot = await this.prisma.ordenTrabajo.findFirst({ where: { id, idTaller } });
     if (!ot) throw new NotFoundException('Orden de trabajo no encontrada');
 
@@ -254,17 +296,19 @@ export class OrdenesService {
         },
       });
 
+      // Recalcular estado de la OS
+      await this.ordenesServicioService.recalcularEstadoOS(
+        ot.idOrdenServicio,
+        usuario,
+        tx,
+      );
+
       return otActualizada;
     });
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
-  /**
-   * Valida la transición teniendo en cuenta el estado especial EN_ESPERA.
-   * Si la OT está en EN_ESPERA, el único destino válido es el estado
-   * inmediatamente anterior a haber entrado en pausa.
-   */
   private async validarTransicion(
     ot: { id: string; estado: EstadoOT },
     nuevoEstado: EstadoOT,
@@ -279,7 +323,7 @@ export class OrdenesService {
     return esTransicionValida(ot.estado, nuevoEstado, usuario.rol as RolUsuario);
   }
 
-  // ─── Log de auditoría ────────────────────────────────────────────────────
+  // ─── Log de auditoría ─────────────────────────────────────────────────────
 
   async getLog(idOT: string, idTaller: string) {
     const ot = await this.prisma.ordenTrabajo.findFirst({

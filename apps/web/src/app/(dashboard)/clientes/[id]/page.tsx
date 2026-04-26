@@ -20,19 +20,40 @@ interface VehiculoCliente {
   numeroSerie: string;
   sucursal: string | null;
   activo: boolean;
-  _count: { ordenesTrabajo: number };
+  _count: { ordenesTrabajo: number; ordenesServicio?: number };
 }
 
 interface OrdenCliente {
   id: string;
-  numeroOT: number;
+  numeroOT: string;
   estado: string;
   tipoServicio: string | null;
+  frente: string | null;
   descripcion: string | null;
   creadoEn: string;
   fechaEntrega: string | null;
   vehiculo: { marca: string; modelo: string; numeroSerie: string };
   tecnico: { nombre: string } | null;
+  ordenServicio: { id: string; numeroOS: string } | null;
+}
+
+interface OrdenServicioCliente {
+  id: string;
+  numeroOS: string;
+  estado: string;
+  fechaIngreso: string;
+  fechaEntrega: string | null;
+  motivoIngreso: string | null;
+  kilometrajeIngreso: number | null;
+  vehiculo: { marca: string; modelo: string; numeroSerie: string };
+  ordenesTrabajo: {
+    id: string;
+    numeroOT: string;
+    estado: string;
+    frente: string | null;
+    tipoServicio: string | null;
+    tecnico: { nombre: string } | null;
+  }[];
 }
 
 interface ClienteDetalle {
@@ -47,9 +68,11 @@ interface ClienteDetalle {
   creadoEn: string;
   vehiculos: VehiculoCliente[];
   ordenes: OrdenCliente[];
+  ordenesServicio: OrdenServicioCliente[];
   resumen: {
     totalVehiculos: number;
     totalServicios: number;
+    totalOrdenesServicio: number;
     ultimoServicio: string | null;
   };
 }
@@ -142,7 +165,7 @@ export default function ClienteDetallePage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
             <div className="rounded-md bg-blue-100 p-2"><Car className="h-5 w-5 text-blue-600" /></div>
@@ -154,10 +177,19 @@ export default function ClienteDetallePage() {
         </Card>
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
+            <div className="rounded-md bg-indigo-100 p-2"><Wrench className="h-5 w-5 text-indigo-600" /></div>
+            <div>
+              <p className="text-2xl font-bold">{cliente.resumen.totalOrdenesServicio ?? 0}</p>
+              <p className="text-xs text-muted-foreground">Órdenes de Servicio</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
             <div className="rounded-md bg-green-100 p-2"><Wrench className="h-5 w-5 text-green-600" /></div>
             <div>
               <p className="text-2xl font-bold">{cliente.resumen.totalServicios}</p>
-              <p className="text-xs text-muted-foreground">Servicios realizados</p>
+              <p className="text-xs text-muted-foreground">Trabajos (OT)</p>
             </div>
           </CardContent>
         </Card>
@@ -216,28 +248,78 @@ export default function ClienteDetallePage() {
         </CardContent>
       </Card>
 
-      {/* Historial de Servicios */}
+      {/* Órdenes de Servicio */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Wrench className="h-5 w-5" />
-            Historial de Servicios ({cliente.ordenes.length})
+            Órdenes de Servicio ({cliente.ordenesServicio?.length ?? 0})
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {!cliente.ordenesServicio || cliente.ordenesServicio.length === 0 ? (
+            <div className="p-6 text-center text-muted-foreground">Sin órdenes de servicio</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>N° OS</TableHead>
+                  <TableHead>Vehículo</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead className="text-center">OTs</TableHead>
+                  <TableHead>Fecha Ingreso</TableHead>
+                  <TableHead>Fecha Entrega</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {cliente.ordenesServicio.map((os) => (
+                  <TableRow
+                    key={os.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => router.push(`/ordenes-servicio/${os.id}`)}
+                  >
+                    <TableCell className="font-medium">{os.numeroOS}</TableCell>
+                    <TableCell>{os.vehiculo.marca} {os.vehiculo.modelo}</TableCell>
+                    <TableCell>
+                      <span className="inline-block rounded-full bg-indigo-100 text-indigo-800 px-2 py-0.5 text-xs font-medium">
+                        {formatEstado(os.estado)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="outline">{os.ordenesTrabajo.length}</Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{formatDate(os.fechaIngreso)}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{formatDate(os.fechaEntrega)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Historial de Trabajos (OTs) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Wrench className="h-5 w-5" />
+            Trabajos (OTs) ({cliente.ordenes.length})
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {cliente.ordenes.length === 0 ? (
-            <div className="p-6 text-center text-muted-foreground">Sin órdenes de trabajo registradas</div>
+            <div className="p-6 text-center text-muted-foreground">Sin trabajos registrados</div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>N° OT</TableHead>
+                  <TableHead>OS</TableHead>
+                  <TableHead>Frente</TableHead>
                   <TableHead>Vehículo</TableHead>
-                  <TableHead>Tipo</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Técnico</TableHead>
                   <TableHead>Fecha Ingreso</TableHead>
-                  <TableHead>Fecha Entrega</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -247,11 +329,12 @@ export default function ClienteDetallePage() {
                     className="cursor-pointer hover:bg-muted/50"
                     onClick={() => router.push(`/ots/${ot.id}`)}
                   >
-                    <TableCell className="font-medium">OT-{ot.numeroOT}</TableCell>
-                    <TableCell>{ot.vehiculo.marca} {ot.vehiculo.modelo}</TableCell>
-                    <TableCell className="text-sm">
-                      {ot.tipoServicio ? ot.tipoServicio.replace(/_/g, ' ') : '—'}
+                    <TableCell className="font-medium">{ot.numeroOT}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {ot.ordenServicio?.numeroOS ?? '—'}
                     </TableCell>
+                    <TableCell className="text-sm">{ot.frente ?? '—'}</TableCell>
+                    <TableCell>{ot.vehiculo.marca} {ot.vehiculo.modelo}</TableCell>
                     <TableCell>
                       <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${ESTADO_COLORS[ot.estado] || 'bg-gray-100 text-gray-800'}`}>
                         {formatEstado(ot.estado)}
@@ -259,7 +342,6 @@ export default function ClienteDetallePage() {
                     </TableCell>
                     <TableCell className="text-sm">{ot.tecnico?.nombre || '—'}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{formatDate(ot.creadoEn)}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{formatDate(ot.fechaEntrega)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
